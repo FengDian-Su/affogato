@@ -18,4 +18,5 @@ outputs/
 
 # OS / editor
 .DS_Store
-.vscode/
+.vscode/code/objaverse_to_affogato.py
+code/objaverse_to_affogato_v2.py
