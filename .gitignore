@@ -1,0 +1,21 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Environments
+venv/
+env/
+
+# Datasets (❗重要)
+dataset/
+
+# Large 3D files (避免上傳)
+*.glb
+
+# Logs / outputs
+*.log
+outputs/
+
+# OS / editor
+.DS_Store
+.vscode/
