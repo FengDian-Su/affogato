@@ -2,11 +2,15 @@
 __pycache__/
 *.pyc
 
+# Checkpoints
+*.pt
+
 # Environments
 venv/
 env/
 
 # Datasets (❗重要)
+data/
 dataset/
 
 # Large 3D files (避免上傳)
