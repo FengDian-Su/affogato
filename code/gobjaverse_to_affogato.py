@@ -5,7 +5,8 @@ from tqdm import tqdm
 # =========================================================
 # 🔧 Project Root
 # =========================================================
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/data_generation/"
+print(f"Project Root: {PROJECT_ROOT}")
 
 # =========================================================
 # 🔧 Paths

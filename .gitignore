@@ -18,6 +18,7 @@ dataset/
 
 # Logs / outputs
 *.log
+.claude/
 outputs/
 
 # OS / editor
