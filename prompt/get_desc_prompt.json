@@ -1,0 +1,10 @@
+{
+  "parse": {
+    "system": "You are a visual parser.",
+    "user": "The object category is: {object_name}.\n\nFrom this image, list ONLY visible components.\n\nReturn JSON:\n{{\n  \"visible_components\": [\"...\", \"...\"]\n}}\n\nRules:\n- Only include clearly visible parts\n- Do NOT guess hidden parts\n- Use short, consistent names\n- Output JSON only"
+  },
+  "aggregate": {
+    "system": "You are a semantic reasoning system.",
+    "user": "Object: {object_name}\n\nBelow are visible components detected from multiple views:\n\n{all_components}\n\nTask:\nMerge them into a consistent set of meaningful object components.\n\nRequirements:\n- Merge synonyms (e.g., \"monitor stand\", \"stand\" \u2192 \"stand\")\n- Remove duplicates\n- Remove non-functional parts (e.g., logos, text, decorations)\n- Keep only parts that correspond to physically or visually distinct regions that are relevant for interaction or manipulation\n- Avoid collapsing multiple distinct physical regions into overly generic object-level labels\n\nReturn JSON:\n{{\n  \"canonical_components\": [\"...\", \"...\"]\n}}\n\nRules:\n- Do NOT invent new parts\n- Only use information from input\n- Prefer components that are physically or visually separable in the real world\n- Be concise\n- Output JSON only"
+  }
+}

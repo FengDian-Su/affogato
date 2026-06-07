@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>run_pipeline Notebook — 流程解析</title>
+<style>
+  :root{
+    --bg:#0f1116; --panel:#171a21; --panel2:#1d212b; --border:#2a2f3a;
+    --fg:#e6e8ee; --muted:#9aa3b2; --accent:#7aa2f7; --accent2:#bb9af7;
+    --gemma:#f7768e; --molmo:#7dcfff; --sam:#9ece6a; --geo:#e0af68;
+    --code:#c0caf5; --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;
+    line-height:1.65;font-size:15px}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 120px}
+  h1{font-size:30px;margin:0 0 6px;letter-spacing:.3px}
+  h2{font-size:22px;margin:48px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+  h3{font-size:17px;margin:26px 0 10px;color:var(--accent)}
+  h4{font-size:15px;margin:18px 0 6px;color:var(--accent2)}
+  p{margin:10px 0}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code{font-family:var(--mono);background:#0b0d12;border:1px solid var(--border);
+    border-radius:4px;padding:1px 6px;font-size:12.5px;color:var(--code)}
+  pre{background:#0b0d12;border:1px solid var(--border);border-radius:8px;
+    padding:14px 16px;overflow:auto;font-family:var(--mono);font-size:12.5px;
+    color:var(--code);line-height:1.5;margin:10px 0}
+  .sub{color:var(--muted);font-size:14px}
+  .lead{color:var(--muted);font-size:15.5px;max-width:760px}
+  .tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;
+    vertical-align:middle;margin-left:8px;letter-spacing:.4px}
+  .tag.gemma{background:rgba(247,118,142,.15);color:var(--gemma);border:1px solid var(--gemma)}
+  .tag.molmo{background:rgba(125,207,255,.15);color:var(--molmo);border:1px solid var(--molmo)}
+  .tag.sam{background:rgba(158,206,106,.15);color:var(--sam);border:1px solid var(--sam)}
+  .tag.geo{background:rgba(224,175,104,.15);color:var(--geo);border:1px solid var(--geo)}
+
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.5px}
+  th,td{border:1px solid var(--border);padding:8px 11px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--fg);font-weight:600}
+  td code{font-size:12px}
+
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    padding:18px 20px;margin:16px 0}
+  .io{display:grid;grid-template-columns:90px 1fr;gap:0;margin:10px 0;
+    border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .io .k{background:var(--panel2);padding:9px 12px;font-weight:600;font-size:13px;
+    border-bottom:1px solid var(--border)}
+  .io .v{padding:9px 12px;font-size:13.5px;border-bottom:1px solid var(--border)}
+  .io .k:last-of-type,.io .v:last-of-type{border-bottom:none}
+
+  .prompt{background:#11151f;border-left:3px solid var(--accent2);border-radius:0 8px 8px 0;
+    padding:12px 16px;margin:10px 0;font-family:var(--mono);font-size:12.5px;
+    white-space:pre-wrap;color:#dfe6ff}
+  .prompt.molmo{border-left-color:var(--molmo)}
+  .prompt.gemma{border-left-color:var(--gemma)}
+
+  .note{background:rgba(122,162,247,.08);border:1px solid rgba(122,162,247,.3);
+    border-radius:8px;padding:11px 15px;margin:12px 0;font-size:13.5px}
+  .warn{background:rgba(247,118,142,.08);border:1px solid rgba(247,118,142,.3);
+    border-radius:8px;padding:11px 15px;margin:12px 0;font-size:13.5px}
+
+  .flow{display:flex;flex-direction:column;gap:0;margin:18px 0}
+  .frow{display:flex;align-items:stretch;gap:12px;flex-wrap:wrap}
+  .fbox{flex:1;min-width:200px;background:var(--panel);border:1px solid var(--border);
+    border-radius:10px;padding:13px 15px}
+  .fbox .t{font-weight:700;font-size:14px;margin-bottom:3px}
+  .fbox .d{font-size:12.5px;color:var(--muted)}
+  .arrow{text-align:center;color:var(--muted);font-size:20px;padding:4px 0}
+  .barL{border-left:4px solid var(--gemma)} .barL.m{border-left-color:var(--molmo)}
+  .barL.s{border-left-color:var(--sam)} .barL.g{border-left-color:var(--geo)}
+
+  .toc{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    padding:14px 20px;margin:20px 0;columns:2;column-gap:32px}
+  .toc a{display:block;padding:3px 0;font-size:13.5px}
+  .step-n{display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;
+    background:var(--accent);color:#0b0d12;border-radius:7px;font-weight:700;font-size:13px;margin-right:8px}
+  .hl{color:var(--molmo);font-weight:600}
+  .hlg{color:var(--gemma);font-weight:600}
+  ul{margin:8px 0;padding-left:22px} li{margin:4px 0}
+  .small{font-size:12.5px;color:var(--muted)}
+  hr{border:none;border-top:1px solid var(--border);margin:30px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>run_pipeline — 流程解析</h1>
+  <p class="lead">Affogato bimanual affordance data pipeline。本文件 step-by-step 拆解
+  <code>data_generation/run_pipeline.ipynb</code>（與其匯出版 <code>run_pipeline.py</code>），
+  重點標出兩個語言模型 <b>Gemma-3-4B</b> 與 <b>MolmoPoint-8B</b> 各自的 prompt / input / output。</p>
+  <p class="small">來源：<code>data_generation/run_pipeline.ipynb</code> · <code>run_pipeline.py</code> · <code>output_components.json</code> · <code>../bimanual_annotation/</code> · <code>../prompt/molmo_prompt_format.md</code></p>
+
+  <div class="toc">
+    <a href="#overview">0 · 總覽與資料流</a>
+    <a href="#models">1 · 兩個模型的角色分工</a>
+    <a href="#inputs">2 · 輸入資料格式</a>
+    <a href="#gemma">3 · LLM #1：Gemma-3-4B（上游）</a>
+    <a href="#molmo">4 · LLM #2：MolmoPoint-8B（核心）</a>
+    <a href="#steps">5 · Step-by-step（14 步）</a>
+    <a href="#sam2">6 · SAM2 + 3D voting</a>
+    <a href="#outputs">7 · 輸出產物</a>
+    <a href="#notes">8 · 觀察與注意事項</a>
+  </div>
+
+  <!-- ===================== OVERVIEW ===================== -->
+  <h2 id="overview">0 · 總覽與資料流</h2>
+  <p>目標：對 gobjaverse 的 3D 物件，產生 <b>role-conditioned bimanual affordance</b> —
+  也就是「雙手操作某物件時，每隻手該碰哪個 3D 區域」的 heatmap。整條 pipeline 串接四個元件：</p>
+
+  <div class="flow">
+    <div class="frow">
+      <div class="fbox barL"><div class="t">① Gemma-3-4B <span class="tag gemma">LLM · 上游</span></div>
+        <div class="d">看多視角圖 → 判斷可操作性、抽部件、推理雙手分工。產出 <code>output_components.json</code>（含 question / answer 兩個 role）。<b>不在本 notebook 執行</b>，是預先跑好的輸入。</div></div>
+    </div>
+    <div class="arrow">▼ <span class="small">output_components.json（answer = 兩個部件名）</span></div>
+    <div class="frow">
+      <div class="fbox barL m"><div class="t">② MolmoPoint-8B <span class="tag molmo">LLM · 本 notebook 核心</span></div>
+        <div class="d">每個 role × 每個 view 各跑一次 pointing。輸入「圖 + 一句 part-name query」，輸出 2D 點座標（取 top-1）。</div></div>
+    </div>
+    <div class="arrow">▼ <span class="small">每 (view, role) 一個 2D 點</span></div>
+    <div class="frow">
+      <div class="fbox barL s"><div class="t">③ SAM2 <span class="tag sam">分割 · 非 LLM</span></div>
+        <div class="d">用 Molmo 的點當 prompt → mask logits → sigmoid → 再乘上以該點為中心的 Gaussian 權重 → 2D probabilistic heatmap。</div></div>
+    </div>
+    <div class="arrow">▼ <span class="small">每 (view, role) 一張 2D heatmap</span></div>
+    <div class="frow">
+      <div class="fbox barL g"><div class="t">④ Multi-view Voting <span class="tag geo">幾何 · 非 LLM</span></div>
+        <div class="d">把 3D 點雲投影到每個 view，做可見性檢查，平均所有可見 view 的 heatmap 分數 → 每個 3D 點、每個 role 的 affordance score。</div></div>
+    </div>
+  </div>
+
+  <div class="note"><b>一句話總結：</b>這個 notebook 真正執行的「語言模型」只有 <span class="hl">MolmoPoint-8B</span> 一個。
+  Gemma 的角色是<b>離線預生成</b> <code>output_components.json</code>，notebook 只是把它讀進來當文字輸入。SAM2 與 voting 都是非 LLM 的後處理。</div>
+
+  <!-- ===================== MODELS ===================== -->
+  <h2 id="models">1 · 兩個模型的角色分工</h2>
+  <table>
+    <tr><th>面向</th><th style="color:var(--gemma)">Gemma-3-4B</th><th style="color:var(--molmo)">MolmoPoint-8B</th></tr>
+    <tr><td>Model ID</td><td><code>google/gemma-3-4b-it</code></td><td><code>allenai/MolmoPoint-8B</code></td></tr>
+    <tr><td>在 pipeline 的位置</td><td>上游語意層（離線）</td><td>本 notebook 核心（線上）</td></tr>
+    <tr><td>任務</td><td>可操作性判斷 → 部件抽取 → 雙手 affordance 推理 → 生成 question/answer</td><td>把語意 query 定位成影像上的點（pointing）</td></tr>
+    <tr><td>輸入</td><td>多視角 RGB（4 views）+ 文字 prompt</td><td>單張 RGB + 一句 part-name query</td></tr>
+    <tr><td>輸出</td><td>JSON：components、affordance、<code>answer</code>（2 個部件名）</td><td><code>&lt;points coords="..."/&gt;</code> → 解析成 (x,y)</td></tr>
+    <tr><td>呼叫次數 / 物件</td><td>數次（per-view parse + aggregate + reason）</td><td><b>24 views × 2 roles = 48 次</b></td></tr>
+    <tr><td>程式位置</td><td><code>../bimanual_annotation/</code>（prototype）</td><td><code>run_pipeline</code> Step 12</td></tr>
+    <tr><td>dtype / decode</td><td>bf16 · greedy</td><td>bf16 + autocast · greedy · <code>max_new_tokens=200</code></td></tr>
+  </table>
+
+  <!-- ===================== INPUTS ===================== -->
+  <h2 id="inputs">2 · 輸入資料格式</h2>
+
+  <h3>2.1 <code>output_components.json</code> — Gemma 的離線產物（notebook 的主要文字輸入）</h3>
+  <p class="sub">50 筆。notebook 用 <code>DATA_INDEX</code> 取其中一筆。實際被 Molmo 用到的只有 <code>object_name</code> 與 <code>answer</code>。</p>
+  <pre>{
+  "object_name": "Monitor",
+  "operable": true,                          <span class="small"># gate：false 直接跳過</span>
+  "views_used": ["...00000.png", "...00010.png", ...],
+  "final_components": [
+    {"name": "Monitor Frame", "interaction": "A hand can grasp and adjust..."},
+    {"name": "Stand",         "interaction": "A hand can grasp and adjust..."},
+    {"name": "Screen",        "interaction": "A hand can touch..."}
+  ],
+  "affordance": {
+    "reason": "...adjust its height using the stand. One hand grasps the stand while the other stabilizes the frame...",
+    "affordance_parts": ["Stand", "Monitor Frame"]
+  },
+  "question": "The task is to adjust the height of a display device. Point to the part you would grasp and move..., and point to another part you would hold steady...",
+  "answer": ["Stand", "Monitor Frame"],      <span class="hl"># ← 這個被 Molmo 拿來組 query</span>
+  "object_id": "b9223e941d0840fa9a5d668fb976f1a4"
+}</pre>
+  <div class="warn"><b>注意：</b><code>question</code> 欄位雖然被讀進來，但 <b>實際沒被用到</b>（只在 debug print）。
+  Molmo 的 query 是直接用 <code>answer[0]</code> / <code>answer[1]</code> 兩個部件名組出來的（見 §4）。</div>
+
+  <h3>2.2 <code>dataset/gobjaverse_to_affogato_nj.json</code> — 路徑對照表</h3>
+  <pre>[{ "src": "dataset/gobjaverse/electronics/0/13912",                  <span class="small"># 多視角 render 來源</span>
+   "dst": "dataset/affogato/affogato_all_part000/b9223e94...":  }]  <span class="small"># GT 點雲 (xyzc.npy) 位置</span></pre>
+  <p class="sub"><code>DATA_INDEX</code> 同時索引 <code>output_components.json</code> 與這份表（兩者順序對齊）。</p>
+
+  <h3>2.3 每個視角的 render 檔（gobjaverse 格式）</h3>
+  <table>
+    <tr><th>檔案</th><th>內容</th><th>用途</th></tr>
+    <tr><td><code>{v:05d}/{v:05d}.png</code></td><td>RGB 影像</td><td>Molmo / SAM2 輸入、點雲顏色</td></tr>
+    <tr><td><code>{v:05d}/{v:05d}_nd.exr</code></td><td>4 通道：normal(0-2) + depth(3)</td><td>反投影成 3D、可見性檢查</td></tr>
+    <tr><td><code>{v:05d}/{v:05d}.json</code></td><td>相機外參 x/y/z/origin</td><td>建 c2w 矩陣</td></tr>
+    <tr><td><code>{dst}/xyzc.npy</code></td><td>GT 點雲 [N, ≥3]</td><td>voting 的目標點雲之一</td></tr>
+  </table>
+
+  <!-- ===================== GEMMA ===================== -->
+  <h2 id="gemma">3 · LLM #1：Gemma-3-4B（上游語意層）<span class="tag gemma">不在本 notebook 執行</span></h2>
+  <p>Gemma 負責把「3D 物件」轉成「結構化的雙手操作語意」，產物即 <code>output_components.json</code>。
+  以下 prompt 取自 prototype <code>../bimanual_annotation/</code>，分三階段（外加一個 yes/no gate）。
+  <span class="small">註：產生 <code>question</code>/<code>answer</code> 欄位的最終版生成腳本未在 repo 內，但其工作可由輸出 schema 還原。</span></p>
+
+  <h3>3.0 Gate：是否適合雙手操作 <span class="small">(is_bimanual.py → output_components 的 <code>operable</code>)</span></h3>
+  <div class="io">
+    <div class="k">Prompt</div><div class="v"><div class="prompt gemma">System: You are an expert in object affordance and human-object interaction.
+User: Given an image, determine whether the object is suitable for bimanual (two-handed) manipulation.
+Answer strictly with one word: yes or no. Do not explain.</div></div>
+    <div class="k">Input</div><div class="v">單張 RGB（物件某一視角）</div>
+    <div class="k">Output</div><div class="v"><code>"yes"</code> / <code>"no"</code> → 寫成 <code>operable</code>。<code>false</code> 時下游 <b>整筆跳過</b>。</div>
+  </div>
+
+  <h3>3.1 Step 1 — Per-view 部件抽取 <span class="small">(parse，每個 view 跑一次)</span></h3>
+  <div class="io">
+    <div class="k">Prompt</div><div class="v"><div class="prompt gemma">System: You are a visual parser.
+User: The object category is: {object_name}.
+From this image, list ONLY visible components.
+Return JSON: { "visible_components": ["...", "..."] }
+Rules: only clearly visible parts · do NOT guess hidden parts · short consistent names · JSON only</div></div>
+    <div class="k">Input</div><div class="v">RGB（4 個取樣視角，逐一）+ <code>object_name</code></div>
+    <div class="k">Output</div><div class="v">每視角一份 <code>visible_components: [...]</code></div>
+  </div>
+
+  <h3>3.2 Step 2 — 跨視角合併 <span class="small">(aggregate，純文字)</span></h3>
+  <div class="io">
+    <div class="k">Prompt</div><div class="v"><div class="prompt gemma">System: You are a semantic reasoning system.
+User: Object: {object_name}. Below are visible components detected from multiple views: {all_components}
+Task: merge into a consistent set of meaningful components.
+- merge synonyms · remove duplicates · remove non-functional parts (logos/text/decoration)
+- keep parts that are physically/visually distinct & relevant for interaction
+Return JSON: { "canonical_components": ["...", "..."] }</div></div>
+    <div class="k">Input</div><div class="v">Step 1 收集到的所有 <code>visible_components</code>（多視角合集，純文字）</div>
+    <div class="k">Output</div><div class="v"><code>canonical_components: [...]</code> → 對應 <code>final_components</code></div>
+  </div>
+
+  <h3>3.3 Step 3 — 雙手 affordance 推理 <span class="small">(reason，純文字)</span></h3>
+  <div class="io">
+    <div class="k">Prompt</div><div class="v"><div class="prompt gemma">System: You are an expert in bimanual manipulation.
+User: Object: {object_name}. Available components: {components}
+Task: explain how a human manipulates this object using two hands.
+Return JSON: { "reason": "...", "affordance_parts": ["...","..."], "left_hand": "...", "right_hand": "..." }
+Rules: ONLY use listed components · don't invent/refine parts · physically plausible</div></div>
+    <div class="k">Input</div><div class="v">合併後的 <code>components</code></div>
+    <div class="k">Output</div><div class="v"><code>reason</code> + <code>affordance_parts</code>（≈ 最終 <code>answer</code> 的兩個部件）。<br>
+      <span class="small">prototype 還會輸出 <code>left_hand</code>/<code>right_hand</code>，但 <code>output_components.json</code> 已改為 hand-agnostic 的 <code>answer</code> list，與 <code>molmo_prompt_format.md</code> 的規範一致。</span></div>
+  </div>
+
+  <div class="note"><b>Gemma → Molmo 的交接點：</b><code>affordance.affordance_parts</code> ≈ <code>answer = ["Stand", "Monitor Frame"]</code>。
+  這個 2 元素 list 就是下游兩個 role（<code>role_move</code>, <code>role_action</code>）的部件名來源。</div>
+
+  <!-- ===================== MOLMO ===================== -->
+  <h2 id="molmo">4 · LLM #2：MolmoPoint-8B（notebook 核心）<span class="tag molmo">Step 12</span></h2>
+
+  <h3>4.1 Role / Query 組裝 <span class="small">(notebook cell 27)</span></h3>
+  <pre>ROLE_QUERIES = {
+    "role_move":   f"Point to the part of the {name} that is the {answer[0]}.",
+    "role_action": f"Point to the part of the {name} that is the {answer[1]}.",
+}</pre>
+  <p>以 Monitor（<code>answer=["Stand","Monitor Frame"]</code>）為例，實際送進 Molmo 的兩句 query：</p>
+  <div class="prompt molmo">role_move   →  "Point to the part of the Monitor that is the Stand."
+role_action →  "Point to the part of the Monitor that is the Monitor Frame."</div>
+  <p class="small">採用 <code>molmo_prompt_format.md</code> 的 <b>Template B（part-name）</b>：用部件名而非動詞，避免多 role 的 attention 塌到同一個顯著區域。每個 role 一定<b>各跑一次</b>推論（多 role 塞同一句的話，回來的點分不清誰是誰）。</p>
+
+  <h3>4.2 單張推論：<code>molmo_query_image()</code> <span class="small">(cell 28)</span></h3>
+  <div class="io">
+    <div class="k">Input</div><div class="v">1 張 PIL RGB image + 1 句 query text（messages: image + text）</div>
+    <div class="k">生成</div><div class="v"><code>max_new_tokens=200</code>，greedy，<code>inference_mode</code> + bf16 autocast</div>
+    <div class="k">Raw out</div><div class="v">decode 後的文字，含 Molmo pointing token：<code>&lt;points coords="frame idx x y ..."/&gt;</code>（座標 0–1000 千分比）</div>
+    <div class="k">解析</div><div class="v"><code>extract_image_points(...)</code> 用 processor 回傳的 <code>metadata</code>（token_pooling / subpatch_mapping / image_sizes）把 token 還原成 <b>影像座標 (x,y)</b></div>
+    <div class="k">取點</div><div class="v"><b>只留 top-1</b>：<code>extracted[0]</code> 的 (x,y)。Molmo 解碼順序即 confidence 順序。0 點 → 回空 list <code>[]</code></div>
+  </div>
+  <pre>extracted = extract_image_points(output_text=generated_text, pooling=..., mappings=...,
+                                 image_sizes=metadata["image_sizes"], ...)
+if len(extracted) &gt; 0:
+    _, _, x, y = extracted[0]      <span class="small"># (frame, idx, x, y) → 取 x,y</span>
+    pts = [np.array([x, y])]
+else:
+    pts = []                       <span class="small"># 該 (view,role) 無點 → 之後 heatmap 全 0</span></pre>
+
+  <h3>4.3 全掃描：per-role × per-view</h3>
+  <div class="io">
+    <div class="k">迴圈</div><div class="v">2 roles × 24 views = <b>48 次 Molmo 呼叫</b></div>
+    <div class="k">輸出結構</div><div class="v"><code>molmo_points_per_view_per_role[role][view_idx] = [np.array([x,y])] 或 []</code></div>
+    <div class="k">視覺化</div><div class="v">每個 view 存一張標星號的圖到 <code>output/{id}/molmo/molmo_view_{i}.png</code></div>
+  </div>
+  <div class="warn"><b>fallback 未實作：</b><code>molmo_prompt_format.md</code> 設計了 A→B→C 三段 fallback（primary 回 0 點時改用 part-name → functional-region）。
+  目前 notebook 只跑 Template B 一次；回 0 點就直接記為 missing（heatmap 全 0、該 view 不參與該 role 投票）。</div>
+
+  <!-- ===================== STEPS ===================== -->
+  <h2 id="steps">5 · Step-by-step（notebook 14 步）</h2>
+  <p class="sub">綠＝幾何/IO，藍＝Molmo，紫＝SAM2。每步標出 Input → Output。</p>
+
+  <div class="card barL g">
+    <h4><span class="step-n">1</span>環境設定 <span class="tag geo">geo/IO</span></h4>
+    <ul><li>import（cv2, torch, transformers, sam2, open3d, plotly...）</li>
+    <li><code>OPENCV_IO_ENABLE_OPENEXR=1</code> 啟用 EXR 讀取</li>
+    <li>選 GPU（notebook 預設 <code>GPU_INDEX=2</code>；.py 用 <code>--gpu</code>）</li></ul>
+  </div>
+
+  <div class="card barL g">
+    <h4><span class="step-n">2</span>核心函數定義 <span class="tag geo">geo/IO</span></h4>
+    <table>
+      <tr><th>函數</th><th>做什麼</th></tr>
+      <tr><td><code>get_intrinsic_matrix(H,W)</code></td><td>內參 K，固定焦距 fx=fy=1422.222（基於 1024，按解析度縮放）</td></tr>
+      <tr><td><code>read_camera_matrix(json)</code></td><td>讀 x/y/z/origin → c2w（<b>Y、Z 軸取負</b>做座標系轉換）</td></tr>
+      <tr><td><code>read_depth_from_exr(exr,cam)</code></td><td>取 channel 3 為 depth；過濾 near plane 前的值（near=√3/2≈0.867）</td></tr>
+      <tr><td><code>read_rgb_image(path)</code></td><td>BGR→RGB、去 alpha、normalize 到 [0,1]</td></tr>
+    </table>
+  </div>
+
+  <div class="card barL g">
+    <h4><span class="step-n">3</span>2D→3D 反投影 <span class="tag geo">geo</span></h4>
+    <div class="io"><div class="k">In</div><div class="v">depth [H,W] + K + c2w (+ rgb)</div>
+    <div class="k">Out</div><div class="v">world points [N,3] + colors。公式：<code>P_cam = K⁻¹·[u,v,1]·d</code>；<code>P_world = c2w·P_cam</code></div></div>
+    <p class="small"><code>convert_pose_flip_yz()</code>：投影前再對 c2w 乘上 diag(1,-1,-1,1) 修正座標系。</p>
+  </div>
+
+  <div class="card barL g">
+    <h4><span class="step-n">4</span>讀取資料設定 <span class="tag geo">IO</span></h4>
+    <div class="io"><div class="k">In</div><div class="v"><code>DATA_INDEX</code></div>
+    <div class="k">Out</div><div class="v"><code>object_id, name, question, answer, pc_path, img_folder_path</code></div></div>
+    <p class="small">.py 版多了 <b>operable gate</b>：<code>operable=false</code> → <code>return None</code> 跳過整筆。</p>
+  </div>
+
+  <div class="card barL g">
+    <h4><span class="step-n">5–6</span>單視角反投影（預覽） <span class="tag geo">geo</span></h4>
+    <p>讀 <code>VIEW_IDX=0</code> 的 rgb/depth/相機 → 反投影成單視角點雲。純預覽/sanity check。</p>
+  </div>
+
+  <div class="card barL g">
+    <h4><span class="step-n">7</span>單視角點雲視覺化 <span class="tag geo">viz</span></h4>
+    <p>matplotlib 3D scatter（函數定義為主）。</p>
+  </div>
+
+  <div class="card barL g">
+    <h4><span class="step-n">8</span>多視角點雲重建 <span class="tag geo">geo</span></h4>
+    <div class="io"><div class="k">In</div><div class="v">24 views 的 rgb+depth+相機</div>
+    <div class="k">Out</div><div class="v">合併點雲 <code>all_points/all_colors</code> + 相機位置；經 Open3D <code>remove_statistical_outlier</code>(nb=20, std=1.0) 去離群</div></div>
+  </div>
+
+  <div class="card barL g">
+    <h4><span class="step-n">9–10</span>完整點雲視覺化 <span class="tag geo">viz</span></h4>
+    <p>matplotlib / plotly 互動式檢視合併後點雲。</p>
+  </div>
+
+  <div class="card barL g">
+    <h4><span class="step-n">11</span>存點雲 + 載入視角影像 <span class="tag geo">IO</span></h4>
+    <div class="io"><div class="k">Out</div><div class="v"><code>output/{id}/recon.npz</code>（points/colors/camera_positions）；<code>view_images</code>(PIL) + <code>view_images_np</code> ×24，給 Molmo/SAM2 用</div></div>
+  </div>
+
+  <div class="card barL m">
+    <h4><span class="step-n">12</span>Molmo affordance 標註 <span class="tag molmo">Molmo</span></h4>
+    <div class="io">
+      <div class="k">In</div><div class="v">24 張 PIL image × <code>ROLE_QUERIES</code>（2 句 part-name query）</div>
+      <div class="k">Out</div><div class="v"><code>molmo_points_per_view_per_role[role][view]</code> = top-1 (x,y) 或 []</div>
+    </div>
+    <p class="small">細節見 <a href="#molmo">§4</a>。這是本 notebook 唯一執行的語言模型推論。</p>
+  </div>
+
+  <div class="card barL s">
+    <h4><span class="step-n">13</span>SAM2：點 → mask → heatmap <span class="tag sam">SAM2</span></h4>
+    <div class="io">
+      <div class="k">In</div><div class="v">view image + Molmo 點（當 positive point prompt）</div>
+      <div class="k">流程</div><div class="v"><code>predict(multimask_output=True, return_logits=True)</code> → 取 <code>best_iou</code>(或 smallest) mask → <code>sigmoid(logits)</code> → 再乘以該點的 Gaussian 權重（<code>sigma=77</code>）</div>
+      <div class="k">Out</div><div class="v"><code>heatmaps_per_view_per_role[role][view]</code> = [H,W] ∈ [0,1]；無點 → 全 0</div>
+    </div>
+  </div>
+
+  <div class="card barL g">
+    <h4><span class="step-n">14</span>多視角 voting → 3D affordance <span class="tag geo">geo</span></h4>
+    <div class="io">
+      <div class="k">In</div><div class="v">目標 3D 點雲 + 24 張 2D heatmap + 相機參數 + depth maps</div>
+      <div class="k">流程</div><div class="v">每點投影到每個 view → 過濾（在相機前 / 在畫面內 / 深度可見不被遮擋，<code>depth_tolerance=0.15</code>）→ 對所有可見 view 的 heatmap 分數取平均</div>
+      <div class="k">Out</div><div class="v">每個 role：<code>scores [N]</code>（affordance）+ <code>counts [N]</code>（被幾個 view 看到）</div>
+    </div>
+    <p class="small">對 <b>GT 點雲</b>（<code>xyzc.npy</code>）與 <b>重建點雲</b>（<code>recon.npz</code>）各做一次。最後輸出 3D plotly HTML。</p>
+  </div>
+
+  <!-- ===================== SAM2 / VOTING ===================== -->
+  <h2 id="sam2">6 · SAM2 + 3D voting 的數學重點</h2>
+  <h3>SAM2 heatmap</h3>
+  <p><code>heatmap = sigmoid(best_mask_logits) × gaussian_weight(center=molmo_point, σ=77)</code>。
+  Gaussian 把信心集中在 Molmo 點附近，避免 SAM2 把整個大區塊都算進去；多點時取各 Gaussian 的 max（union）。</p>
+  <h3>Voting（2D heatmap → 3D 分數）</h3>
+  <pre>cam = w2c · P_world                       <span class="small"># 世界 → 相機</span>
+uv  = (K · cam_xyz) / z                    <span class="small"># 投影到像素</span>
+visible = in_front &amp; in_bounds &amp; (z &lt; sampled_depth·(1+tol))   <span class="small"># 遮擋檢查</span>
+score[p] = mean over visible views of heatmap[v,u]            <span class="small"># 平均</span></pre>
+  <p class="small">每個 3D 點的最終 affordance = 它在「能看到它」的所有 view 上的 heatmap 值的平均。被遮擋/看不到的 view 不貢獻。</p>
+
+  <!-- ===================== OUTPUTS ===================== -->
+  <h2 id="outputs">7 · 輸出產物（<code>output/{object_id}/</code>）</h2>
+  <table>
+    <tr><th>檔案</th><th>內容</th></tr>
+    <tr><td><code>recon.npz</code></td><td>重建點雲 points/colors/camera_positions</td></tr>
+    <tr><td><code>molmo/molmo_view_{i}.png</code></td><td>每個 view 上各 role 的 Molmo 點（星號標記）</td></tr>
+    <tr><td><code>sam2/{role}/sam2_view_{i}.png</code></td><td>每個 view 的 SAM2 heatmap overlay</td></tr>
+    <tr><td><code>affordance_{role}_3d.html</code></td><td>3D plotly：點雲依 affordance score 著色（可互動旋轉）</td></tr>
+  </table>
+  <p class="note"><b>最終資料形態：</b>對每個物件、每個 role，得到「3D 點雲上每個點的 affordance 機率」。兩個 role 合起來就是一筆雙手操作的標注。</p>
+
+  <!-- ===================== NOTES ===================== -->
+  <h2 id="notes">8 · 觀察與注意事項</h2>
+  <ul>
+    <li><b>notebook 只跑 Molmo。</b>Gemma 是離線預生成 <code>output_components.json</code>；要理解 Gemma 行為需看 <code>../bimanual_annotation/</code>。</li>
+    <li><b><code>question</code> 欄位未被使用。</b>Molmo query 直接用 <code>answer[0]/answer[1]</code> 兩個部件名（Template B），<code>question</code> 只是被讀進來 print。若想用自然語句 query，需改 <code>ROLE_QUERIES</code>。</li>
+    <li><b>role 數寫死為 2</b>（<code>role_move</code>=answer[0]、<code>role_action</code>=answer[1]）。3+ roles 或 answer 不足 2 個會出問題。</li>
+    <li><b>Molmo fallback 未實作</b>（spec 有 A→B→C，notebook 只跑一次）。建議追蹤每筆的「0 點 view 比例」。</li>
+    <li><b>notebook vs .py：</b>notebook 是單物件互動版（<code>DATA_INDEX</code>，預設 49）；<code>run_pipeline.py</code> 是批次版（<code>--start/--end/--gpu</code>，含 operable gate、自動存 png/html），兩者核心流程一致。</li>
+    <li><b>座標系：</b>讀相機時 Y/Z 取負，投影前再 flip_yz；depth near plane = √3/2（物件被 normalize 進單位球）。改資料來源時要重新確認。</li>
+    <li><b>路徑相對性：</b>讀 <code>output_components.json</code> / <code>dataset/...</code> 用相對路徑，需從 <code>data_generation/</code> 執行。</li>
+  </ul>
+
+  <hr>
+  <p class="small">本文件由分析 <code>run_pipeline.ipynb</code> / <code>run_pipeline.py</code> / <code>output_components.json</code> / <code>bimanual_annotation/</code> / <code>prompt/molmo_prompt_format.md</code> 整理而成。如 notebook 後續更新（尤其 <code>ROLE_QUERIES</code> 或新增 fallback），需同步修訂。</p>
+
+</div>
+</body>
+</html>

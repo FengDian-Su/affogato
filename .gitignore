@@ -6,17 +6,41 @@ __pycache__/
 venv/
 env/
 
-# Datasets (❗重要)
+# Datasets (❗重要, 215G)
 dataset/
+
+# Model checkpoints / weights
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
 
 # Large 3D files (避免上傳)
 *.glb
 
-# Logs / outputs
+# Logs / pipeline outputs (datasets are regenerable from code)
 *.log
 outputs/
 
-# OS / editor
-.DS_Store
-.vscode/code/objaverse_to_affogato.py
+# Large generated / regenerable artifacts
+data_generation/review/
+data_generation/assets/
+data_generation/results/
+
+# Scratch / temp view extractions
+tmp_views_*/
+
+# Third-party dependencies — tracked via DEPENDENCIES.md, clone separately
+# (anchored to repo root so nested config dirs like data_generation/configs/sam2/ are NOT ignored)
+/sam2/
+/richdreamer/
+
+# Legacy objaverse mapping (superseded, see commit db5f9d8)
+code/objaverse_to_affogato.py
 code/objaverse_to_affogato_v2.py
+
+# OS / editor / tooling
+.DS_Store
+.vscode/
+.claude/
