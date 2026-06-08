@@ -668,15 +668,15 @@ def decompose_task(model, name, comps, task, views, labels=None):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--in", dest="inp", default="outputs/stage0_filtered.kept.json")
-    ap.add_argument("--out", default="outputs/stage1_dataset.json")
+    ap.add_argument("--in", dest="inp", default="outputs/stage0_filtered_redesign.kept.json")
+    ap.add_argument("--out", default="outputs/stage1_redesign_26b.json")
     ap.add_argument("--start", type=int, default=0)
     ap.add_argument("--end", type=int, default=None)
     ap.add_argument("--gpu", default=None)
     ap.add_argument("--target_inter", type=int, default=3)  # qualified inter tasks (incl. fixed pick-up/move)
     ap.add_argument("--target_intra", type=int, default=3)  # qualified intra tasks
     ap.add_argument("--max_rounds", type=int, default=4)    # agentic regenerate rounds before giving up
-    ap.add_argument("--model_id", default=os.environ.get("GEMMA_MODEL_ID", "google/gemma-4-12B-it"))
+    ap.add_argument("--model_id", default=os.environ.get("GEMMA_MODEL_ID", "google/gemma-4-26B-A4B-it"))
     args = ap.parse_args()
 
     inp = args.inp if os.path.isabs(args.inp) else os.path.join(DATA_GEN, args.inp)

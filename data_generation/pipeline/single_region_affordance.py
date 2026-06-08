@@ -405,6 +405,47 @@ def project_and_sample_heatmaps(points, heatmaps, cameras, K_list, depths, depth
     return final_scores, view_counts
 
 
+def partition_two_roles(scoreA, scoreB, roleA, roleB, xyz, thr=0.15):
+    """Resolve the two grounded role heatmaps into two DISTINCT affordance regions.
+
+    Molmo grounds each role's contact_region independently, with no notion of "the other hand"
+    or "opposite" -- so for a symmetric co-lift (both hands on the same part's opposite faces) the
+    two channels collapse onto one region, and for an asymmetric grasp they can overlap at the part
+    boundary. Fix it with a structure-driven partition (no per-object rules), keyed on whether the
+    two roles target the SAME part:
+
+      * same target part -> symmetric co-lift: UNION the two regions, then split into two opposite
+        halves along the region's principal axis (the two hands are interchangeable, so A/B labelling
+        of the halves is arbitrary).
+      * different parts   -> make the regions disjoint (an overlapping point goes to whichever role
+        scores it higher).
+
+    Args:
+        scoreA, scoreB: [N] voted affordance scores for role A / role B.
+        roleA, roleB:   the two role dicts (only ['target'] is read).
+        xyz:            [N, 3] canvas points, same order as the scores.
+        thr:            score threshold defining each region's support.
+    Returns:
+        (scoreA', scoreB'): the two partitioned score arrays.
+    """
+    same = str(roleA.get("target", "")).strip().lower() == str(roleB.get("target", "")).strip().lower()
+    if same:                                       # symmetric co-lift: union then split by principal axis
+        region = np.maximum(scoreA, scoreB)
+        m = region > thr
+        if m.sum() < 10:                           # too small to split -- leave as-is
+            return scoreA, scoreB
+        c = xyz[m].mean(0)
+        axis = np.linalg.svd(xyz[m] - c, full_matrices=False)[2][0]
+        proj = (xyz - c) @ axis
+        split = float(np.median((xyz[m] - c) @ axis))
+        return np.where(proj <= split, region, 0.0), np.where(proj > split, region, 0.0)
+    A, B = scoreA.copy(), scoreB.copy()            # different parts: assign overlap to the higher score
+    both = (A > 0) & (B > 0)
+    A[both & (B >= A)] = 0.0
+    B[both & (A >  B)] = 0.0
+    return A, B
+
+
 # ==============================================================================
 # Orchestration
 # ==============================================================================

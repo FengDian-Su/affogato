@@ -205,7 +205,7 @@ def main():
     ap.add_argument("--gpu", type=int, default=3, help="CUDA device index (sets CUDA_VISIBLE_DEVICES)")
     ap.add_argument("--views", type=int, default=8,
                     help="# separate views to feed (gObjaverse: top-down + underside + orbit azimuths)")
-    ap.add_argument("--model_id", default=os.environ.get("GEMMA_MODEL_ID", "google/gemma-4-12B-it"))
+    ap.add_argument("--model_id", default=os.environ.get("GEMMA_MODEL_ID", "google/gemma-4-26B-A4B-it"))
     ap.add_argument("--fresh", action="store_true", help="ignore existing output; restart from scratch")
     args = ap.parse_args()
 
