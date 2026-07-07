@@ -89,7 +89,7 @@ class Gemma:
         self.processor = AutoProcessor.from_pretrained(model_id, local_files_only=True)
         self.llm = LLM(
             model=model_id, max_model_len=max_model_len, trust_remote_code=True,
-            limit_mm_per_prompt={"image": max_images},
+            limit_mm_per_prompt={"image": max_images, "video": 0, "audio": 0},
             hf_overrides={"vision_config": {"default_output_length": vision_soft_tokens},
                           "vision_soft_tokens_per_image": vision_soft_tokens},
             mm_processor_kwargs={"max_soft_tokens": self.max_soft_tokens},
