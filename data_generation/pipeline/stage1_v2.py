@@ -28,6 +28,8 @@ import argparse
 import subprocess
 import glob
 import re
+import shutil
+import time
 
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True   # tolerate corrupt/truncated render PNGs (libpng CRC errors)
@@ -51,20 +53,6 @@ BIMANUAL_DIR = os.path.join(REPO_ROOT, "bimanual_annotation")
 # never clutters the repo
 VIEW_DIR = os.path.join("/tmp", f"tmp_views_stage1_{os.getpid()}")
 
-# ROLE_VERBS = ["hold", "support", "push", "pull", "press", "lift", "rotate", "slide", "insert"]
-# ROLE_GLOSS = (
-#     "hold = static prehensile grip that immobilizes a part (stabilizer); "
-#     "support = bear weight from below WITHOUT a grip (non-prehensile stabilizer); "
-#     "push = non-prehensile lateral force to translate; "
-#     "pull = grasp then retract along a line; "
-#     "press = localized normal force into a part that yields/clicks (button/latch/lid); "
-#     "lift = raise the whole object upward; "
-#     "rotate = axis-parameterized rotation - covers in-place twist of a knob/cap AND reorient/flip/tilt "
-#     "of the whole object; "
-#     "slide = translate a part along its linear/prismatic track; "
-#     "insert = mate a part into a receptacle/slot"
-# )
-
 ROLE_VERBS = ["hold", "lift", "push", "pull", "press", "slide", "rotate", "squeeze"]
 
 ROLE_GLOSS = (
@@ -78,10 +66,6 @@ ROLE_GLOSS = (
     "rotate = hand applies torque to produce angular displacement about an axis; covers turn, twist, flip, and tilt as long as the primary change is rotational; "
     "squeeze = fingers, palm, or both hands apply inward compressive force from two or more sides, causing deformation, mechanism closure, content expulsion, or clamp closure; "
 )
-
-RELATION_EXAMPLES = ["opposing torque", "stabilize and actuate", "balanced grip on opposite sides",
-                     "opposing force", "orientation control", "guide and actuate",
-                     "constrained translation"]
 
 
 # ---------------------------------------------------------------- helpers
@@ -433,112 +417,6 @@ TASK_RANK_PROMPT = {
     ),
 }
 
-ROLE_DECOMP_PROMPT = {
-    "system": (
-        "You are a manipulation-mechanics expert. You convert one bimanual task into two coordinated, "
-        "hand-agnostic robot roles by FIRST reasoning about how the object physically works, then "
-        "assigning each hand the role it must play. Ground every role in a part visible in the views."
-    ),
-    "user": (
-        "Object: {object_name}\n"
-        "Task: {task}\n"
-        "Goal: {goal}\n"
-        "Why bimanual: {why_bimanual}\n"
-        "Groundable parts (a role's target MUST be one of these, copied verbatim):\n"
-        "{components}\n\n"
-        "Allowed verbs: {role_verbs}\n"
-        "Verb meanings - {role_gloss}.\n\n"
-        "Reason in THREE steps, then emit JSON.\n\n"
-        "STEP 1 - MECHANISM + SCALE. State in one line: (a) the rigid BODY (bears the load, does not "
-        "deform) and which SINGLE part, if any, must MOVE to reach the goal (a lid swings, a cap "
-        "unscrews, a page turns, a drawer slides), or 'nothing moves' for a plain carry; (b) the "
-        "object's real-world SIZE CLASS - judge it from WHAT THE OBJECT IS (the views are SIZE-NORMALIZED, "
-        "so do NOT read size off the image): hand-sized (one hand fully grasps/lifts it: mug, can, book), "
-        "two-handed (one hand cannot lift it but a person can: large box, full pot, crate), or "
-        "furniture-scale (not hand-liftable: cooler, freezer, appliance). Use only parts you can SEE.\n\n"
-        "STEP 2 - OPERATION MECHANICS. If STEP 1 found a part that MOVES, work out the physics of moving "
-        "it BEFORE you name any verb or region. Answer these four lines in order, each in a few words - "
-        "the verb and the contact spot must be DERIVED here, not guessed later. (If STEP 1 said 'nothing "
-        "moves', write 'whole-body, no part motion' and skip to STEP 3.)\n"
-        "  (i) ALLOWED MOTION: how can the moving part move at all? It has ONE way: swing on a hinge "
-        "(arc), slide along a track (straight line), or twist about an axis through its face (a cap / "
-        "knob). Name which, and where the hinge / track / twist-axis is.\n"
-        "  (ii) DIRECTION TO GOAL: along that one motion, which way must the part travel to go from its "
-        "CURRENT state to the GOAL state? (a closed latch must move UP off its catch; an upright bowl's "
-        "rim must rotate DOWN to pour; a shut drawer must come straight OUT). The acting hand's verb is "
-        "THIS motion - pick the allowed verb that produces it.\n"
-        "  (iii) PURCHASE (where to push/pull): place the acting contact where it has the most leverage "
-        "on that motion - the spot FARTHEST from the hinge or axis, on a rigid surface. For a SWING: the "
-        "FREE edge of the part, opposite the hinge (never near the hinge - no leverage). For a TWIST: the "
-        "RIM / outer circumference of the cap or knob (never its flat top or centre - that sits ON the "
-        "axis and turns nothing). For a SLIDE: a graspable handle / front face you can pull along the "
-        "track. Reject any spot on the pivot, on the twist-axis, or on a floppy / non-rigid surface.\n"
-        "  (iv) REACTION (the other hand): the acting push/pull will shove the whole object unless "
-        "something holds it. The other hand HOLDS the part that must stay put - the body the hinge is "
-        "mounted on, the jar the cap screws into, or the OPPOSITE side / cover - so the acting force does "
-        "work. It must be a DIFFERENT part from the acting hand's.\n"
-        "Worked examples (reasoning -> roles):\n"
-        "  - Open a hinged lid: (i) swings on an arc about the rear hinge; (ii) the front of the lid must "
-        "travel UP/open -> verb 'pull'; (iii) grip the lid's FRONT free edge, far from the hinge; (iv) "
-        "other hand 'hold' the body below the hinge. -> A: pull the lid at its front edge; B: hold the body.\n"
-        "  - Unscrew a cap: (i) twists about the axis through the cap's top; (ii) turn it to loosen -> "
-        "verb 'rotate'; (iii) grip the cap's RIM / circumference, NOT its flat top (the top is on the "
-        "axis and gives no turn); (iv) other hand 'hold' the bottle / jar body it screws into. -> A: "
-        "rotate the cap at its rim; B: hold the body.\n"
-        "  - Pour from a bowl: (i) the whole bowl tilts about its lip / rim; (ii) the rim must rotate DOWN "
-        "so contents leave -> verb 'rotate' (tilt), NOT 'hold'; (iii) grip the bowl wall opposite the "
-        "pouring lip for leverage; (iv) other hand 'support' the base from below. -> A: rotate (tilt) the "
-        "bowl; B: support the base.\n\n"
-        "STEP 3 - DIVISION OF LABOUR. First ask: does ONE hand stay still (a static anchor) while the "
-        "other acts (ASYMMETRIC), or do BOTH hands act at the same time (SYMMETRIC)? Then pick ONE "
-        "scheme:\n"
-        "  (A) STABILIZE + ACTUATE  [asymmetric] - one hand HOLDS the part that must stay still (the "
-        "reaction from STEP 2(iv)); the OTHER hand performs the motion on the part that MOVES, using the "
-        "verb from STEP 2(ii) at the purchase contact from STEP 2(iii). Use when ONE part moves relative "
-        "to a held body (open, close, twist a cap, pull out a drawer, press, tilt-to-pour, turn a page).\n"
-        "  (B) WHOLE-BODY  [symmetric, body rigid, no internal motion] - both hands act on the ONE rigid "
-        "body to lift / carry / flip / move it. Grip by the SIZE CLASS from STEP 1: hand-sized / "
-        "base-cuppable -> one hand SUPPORTS the base / underside from below while the other STEADIES a "
-        "handle / rim / upper edge; two-handed-scale whose base one hand CANNOT support (big box, crate) "
-        "-> BOTH hands grip two OPPOSITE outer sides or diagonal corners to lift it level (do NOT balance "
-        "it on one hand under the centre). To FLIP / tilt the whole body, apply matched torque at those "
-        "two opposite grips. To MOVE a FURNITURE-SCALE object that cannot be lifted (cooler, freezer) -> "
-        "both hands PUSH its body in the travel direction (or one pushes + one steers): use 'push', "
-        "never 'lift'.\n"
-        "  (C) CO-ACTUATE  [symmetric, both active] - BOTH hands apply active force AT THE SAME TIME to "
-        "separate, split, or deform the object: each hand grips one of the two parts / sides and they "
-        "move in OPPOSITE or mirrored directions, with NEITHER hand a static anchor. Use for pull two "
-        "halves apart (twist open a shaker / canister), splay open a carton's gable spout, peel two "
-        "sides apart, wring, tear, stretch, or snap.\n\n"
-        "STEP 4 - GROUND EACH HAND, transcribing STEPS 2-3: the acting hand's role = the verb from "
-        "STEP 2(ii) and its contact_region = the purchase spot from STEP 2(iii); the other hand HOLDS / "
-        "SUPPORTS the reaction part from STEP 2(iv).\n"
-        "  - role: an allowed verb that matches the motion derived in STEP 2; a stabilizing hand uses "
-        "'hold' or 'support'. Do NOT assign an actuate verb (rotate / pull / slide / open / press) to a "
-        "part that is FUSED / rigid to the body and cannot move relative to it - if STEP 1 found nothing "
-        "moves, this is a whole-body operation (B), not a part actuation.\n"
-        "  - target: the visible part it contacts (a name from the list, verbatim). A hand that lifts, "
-        "carries, or stabilizes must grip LOAD-BEARING structure (body / base / handle) - never a part "
-        "that swings or detaches (lid / flap / strap / wheel).\n"
-        "  - contact_region: a specific, pointable spot lying ON that hand's own target (the grounder "
-        "points exactly here); the two hands' regions must be DIFFERENT places. For a SYMMETRIC two-sided "
-        "grip the two regions must be on OPPOSITE faces (~180 deg apart) or diagonal corners - never two "
-        "spots on the SAME face.\n"
-        "  - function: what that hand accomplishes, consistent with its verb.\n\n"
-        "Output JSON only (replace every <...>; never output the angle brackets):\n"
-        "{{\n"
-        "  \"mechanism\": \"<rigid body; which part moves, or 'nothing moves'>\",\n"
-        "  \"operation\": \"<from STEP 2: the part's motion + direction to goal + purchase spot, or 'whole-body'>\",\n"
-        "  \"coordination\": \"<stabilize+actuate | co-support | co-actuate>\",\n"
-        "  \"roles\": [\n"
-        "    {{\"id\": \"A\", \"role\": \"<verb>\", \"target\": \"<part>\", \"contact_region\": \"<spot on A's target>\", \"function\": \"<what A does>\"}},\n"
-        "    {{\"id\": \"B\", \"role\": \"<verb>\", \"target\": \"<part>\", \"contact_region\": \"<a different spot, on B's target>\", \"function\": \"<what B does>\"}}\n"
-        "  ],\n"
-        "  \"relation\": \"<force / motion + spatial dependency between the two hands>\"\n"
-        "}}"
-    ),
-}
-
 
 # ---------------------------------------------------------------- per-object pipeline
 def whole_object_fillers(object_name, size_class):
@@ -561,51 +439,29 @@ def whole_object_fillers(object_name, size_class):
     ]
 
 
-def propose_tasks(model, name, comps, views, labels=None, target_min=3, target_max=5, max_rounds=2,
-                  aff_hint=""):
-    """Agentic generate->validate loop: each round brainstorm 5 inter + 5 intra (seeded by affogato
-    affordance cues + avoiding already-kept tasks for diversity), rank/validate, accumulate the qualified
-    ones; stop once enough material to fill to target_max, OR a round adds nothing new (saturated), OR
-    max_rounds is hit. Final total is clamped to [target_min, target_max]: universal transport leads, the
-    ranked brainstormed tasks fill, and if still under target_min the HARD FLOOR is met with GROUNDED
-    whole-object transforms (whole_object_fillers) - never a hallucinated part."""
-    comp_txt = components_to_text(comps)
-    inter_pool, intra_pool, seen, seen_keys = [], [], set(), set()
-    is_scene, size_class = False, "two-handed"
-    for _ in range(max_rounds):
-        prev_total = len(inter_pool) + len(intra_pool)
-        avoid = "; ".join(sorted(seen))[:1600] if seen else "(none yet)"
-        bs = parse_json(model.text_images(
-            TASK_BRAINSTORM_PROMPT["user"].format(object_name=name, components=comp_txt, n=5,
-                                                  avoid=avoid, affogato=aff_hint),
-            views, TASK_BRAINSTORM_PROMPT["system"], labels=labels))
-        is_scene = is_scene or bool(bs.get("is_scene"))
-        size_class = bs.get("size_class", size_class)
-        ranked = parse_json(model.text_images(
-            TASK_RANK_PROMPT["user"].format(object_name=name, components=comp_txt,
-                                            inter=candidates_to_text(bs.get("inter_object", [])),
-                                            intra=candidates_to_text(bs.get("intra_object", []))),
-            views, TASK_RANK_PROMPT["system"], labels=labels))
-        for t in ranked.get("inter_object", []):
+def accumulate_ranked(ranked, inter, intra, seen, seen_keys):
+    """Add a RANK round's survivors into the inter/intra pools, deduped (exact string + normalized
+    dedup_key + transport filter). Mutates the pools/sets in place; returns how many were added."""
+    added = 0
+    for fam, pool, cat in (("inter_object", inter, "inter"), ("intra_object", intra, "intra")):
+        for t in ranked.get(fam, []):
             k = str(t.get("task", "")).strip().lower(); dk = dedup_key(k)
-            if k and dk not in seen_keys and not is_grasp_task(k):
-                inter_pool.append(dict(t, category="inter")); seen.add(k); seen_keys.add(dk)
-        for t in ranked.get("intra_object", []):
-            k = str(t.get("task", "")).strip().lower(); dk = dedup_key(k)
-            if k and dk not in seen_keys and not is_grasp_task(k):   # transport is whole-body, never intra
-                intra_pool.append(dict(t, category="intra")); seen.add(k); seen_keys.add(dk)
-        n_uni = 2 if "two-handed" in str(size_class).lower() else 1   # universal tasks fill that many slots
-        if is_scene or len(inter_pool) + len(intra_pool) >= max(0, target_max - n_uni):
-            break
-        if len(inter_pool) + len(intra_pool) == prev_total:   # round added nothing new -> saturated, stop
-            break
+            if k and dk not in seen_keys and not is_grasp_task(k):   # transport is whole-body, never a pool task
+                pool.append(dict(t, category=cat)); seen.add(k); seen_keys.add(dk); added += 1
+    return added
 
-    # lead with the universal whole-object TRANSPORT tasks ({pick up, move}, or {move} for furniture),
-    # then the ranked brainstormed tasks; cap at target_max
+
+def enough_tasks(inter, intra, is_scene, size_class, target_max):
+    """Stop condition: scene, or the pools already fill every non-universal slot up to target_max."""
+    n_uni = 2 if "two-handed" in str(size_class).lower() else 1   # universal tasks fill that many slots
+    return is_scene or len(inter) + len(intra) >= max(0, target_max - n_uni)
+
+
+def assemble_tasks(name, is_scene, size_class, inter, intra, target_min, target_max):
+    """Universal transport leads -> ranked brainstormed fill (cap target_max) -> hard-floor backfill with
+    GROUNDED whole-object transforms (never a fabricated part) -> attach the query wrapper. Shared logic."""
     base = [] if is_scene else universal_tasks(name, size_class)
-    tasks = (base + inter_pool + intra_pool)[:target_max]
-    # HARD FLOOR: if still under target_min, backfill with GROUNDED whole-object transforms (turn over /
-    # reorient) - never a hallucinated part. Skip scenes (not one rigid body); furniture yields no fillers.
+    tasks = (base + inter + intra)[:target_max]
     if not is_scene:
         have = {dedup_key(t.get("task", "")) for t in tasks}
         for f in whole_object_fillers(name, size_class):
@@ -738,46 +594,191 @@ GROUND_PROMPT = {
 }
 
 
-def decompose_task(model, name, comps, task, views, labels=None):
-    comp_txt = components_to_text(comps)
-    # call 1: focused operation-mechanics plan. Thinking OFF: measured to add +38-141s/call while
-    # rarely changing the structured plan output (see memory: stage1-thinking-cost) -> dominant speed win.
-    plan = parse_json(model.text_images(
-        OP_PLAN_PROMPT["user"].format(
-            object_name=name, task=task.get("task", ""), goal=task.get("goal", ""),
-            why_bimanual=task.get("why_bimanual", ""), components=comp_txt,
-            role_verbs=", ".join(ROLE_VERBS), role_gloss=ROLE_GLOSS),
-        views, OP_PLAN_PROMPT["system"], labels=labels, enable_thinking=False))
-    plan_txt = json.dumps(plan, ensure_ascii=False) if isinstance(plan, dict) else str(plan)
-    # call 2: ground the plan into two roles (retry once if it echoes placeholders)
-    base = GROUND_PROMPT["user"].format(
-        object_name=name, task=task.get("task", ""), goal=task.get("goal", ""),
-        components=comp_txt, role_verbs=", ".join(ROLE_VERBS), plan=plan_txt)
-    dec, roles = {}, []
-    for attempt in range(2):
-        prompt = base if attempt == 0 else base + ("\n\nOutput REAL verbs, REAL part names from the list, "
-                                                   "and SPECIFIC contact regions - no placeholder text.")
-        dec = parse_json(model.text_images(prompt, views, GROUND_PROMPT["system"], labels=labels))
-        roles = dec.get("roles", [])
-        if valid_decomp(roles):
-            break
-    if not valid_decomp(roles):
-        return None   # drop degenerate query rather than emit placeholder garbage
-    pattern = normalize_pair(dec)
+def build_query_record(task, plan, plan_txt, dec):
+    """Assemble the final query record from a task + its OP_PLAN dict + GROUND dict (roles)."""
+    roles = dec.get("roles", [])
+    p = plan if isinstance(plan, dict) else {}        # tolerate a parse-failed plan (dict.get -> None)
     return {
-        "task":          task.get("task"),
-        "query":         task.get("query"),
-        "goal":          task.get("goal"),
-        "why_bimanual":  task.get("why_bimanual"),
-        "category":      task.get("category"),
-        "mechanism":     plan.get("moving_part") if isinstance(plan, dict) else None,
-        "operation":     plan_txt,
-        "coordination":  plan.get("coordination") if isinstance(plan, dict) else None,
-        "roles":         roles,
-        **pattern,
+        "task": task.get("task"), "query": task.get("query"), "goal": task.get("goal"),
+        "why_bimanual": task.get("why_bimanual"), "category": task.get("category"),
+        "mechanism": p.get("moving_part"),
+        "operation": plan_txt,
+        "coordination": p.get("coordination"),
+        "roles": roles, **normalize_pair(dec),
         "molmo_queries": [molmo_instruction(r) for r in roles],
-        "answer":        [r.get("contact_region") or r.get("target") for r in roles],
+        "answer": [r.get("contact_region") or r.get("target") for r in roles],
     }
+
+
+# ---- BATCHED stage (option B): both propose (propose_tasks_batch) and decompose (decompose_batch) run
+# ONE llm.generate over MANY jobs at once (vLLM continuous batching). Same OP_PLAN->GROUND logic as the
+# serial path, just batched. Verified no cross-request image contamination (scratchpad/vllm_batch_verify.py:
+# 0/17). Records are built by the shared build_query_record, identical to serial.
+def decompose_batch(model, jobs):
+    """jobs: list of {name, comps, task, views, labels}. Returns query records aligned to jobs (None=drop).
+    Phase 1 = batched OP_PLAN (thinking off); Phase 2 = batched GROUND; Phase 3 = re-batch the GROUNDs that
+    echoed placeholders (one retry round). Each phase is ONE model.text_images_batch(...) = one llm.generate
+    over the whole list (vLLM continuous-batches internally; no manual chunking -- the official pattern)."""
+    if not jobs:
+        return []
+    verbs = ", ".join(ROLE_VERBS)
+    op_items = [{
+        "user_text": OP_PLAN_PROMPT["user"].format(
+            object_name=j["name"], task=j["task"].get("task", ""), goal=j["task"].get("goal", ""),
+            why_bimanual=j["task"].get("why_bimanual", ""), components=components_to_text(j["comps"]),
+            role_verbs=verbs, role_gloss=ROLE_GLOSS),
+        "image_urls": j["views"], "system_text": OP_PLAN_PROMPT["system"], "labels": j["labels"],
+    } for j in jobs]
+    plans = [parse_json(o) for o in model.text_images_batch(op_items)]
+    plan_txts = [json.dumps(p, ensure_ascii=False) if isinstance(p, dict) else str(p) for p in plans]
+
+    def ground_items(idxs, retry):
+        items = []
+        for k in idxs:
+            j = jobs[k]
+            u = GROUND_PROMPT["user"].format(
+                object_name=j["name"], task=j["task"].get("task", ""), goal=j["task"].get("goal", ""),
+                components=components_to_text(j["comps"]), role_verbs=verbs, plan=plan_txts[k])
+            if retry:
+                u += ("\n\nOutput REAL verbs, REAL part names from the list, and SPECIFIC contact regions "
+                      "- no placeholder text.")
+            items.append({"user_text": u, "image_urls": j["views"],
+                          "system_text": GROUND_PROMPT["system"], "labels": j["labels"]})
+        return items
+
+    decs = [parse_json(o) for o in model.text_images_batch(ground_items(list(range(len(jobs))), False))]
+    retry_idx = [k for k, d in enumerate(decs) if not valid_decomp(d.get("roles", []))]
+    if retry_idx:
+        rout = [parse_json(o) for o in model.text_images_batch(ground_items(retry_idx, True))]
+        for kk, k in enumerate(retry_idx):
+            decs[k] = rout[kk]
+
+    out = []
+    for k, j in enumerate(jobs):
+        dec = decs[k]
+        if not valid_decomp(dec.get("roles", [])):
+            out.append(None)
+            continue
+        out.append(build_query_record(j["task"], plans[k], plan_txts[k], dec))
+    return out
+
+
+def propose_tasks_batch(model, jobs, target_min=3, target_max=5, max_rounds=2):
+    """BATCHED multi-object propose. Each round runs ONE batched BRAINSTORM + ONE batched RANK over all
+    ACTIVE objects (each = one model.text_images_batch = one llm.generate over the whole active list; vLLM
+    continuous-batches internally), then per-object accumulate + stop-check with INDEPENDENT per-object state
+    (no cross-object contamination). jobs: list of {name, comps, views, labels, aff_hint}. Returns task-lists
+    aligned to jobs."""
+    st = [{"comp_txt": components_to_text(j["comps"]), "inter": [], "intra": [], "seen": set(),
+           "seen_keys": set(), "is_scene": False, "size_class": "two-handed", "active": True, "_bs": {}}
+          for j in jobs]
+    for _ in range(max_rounds):
+        active = [i for i, s in enumerate(st) if s["active"]]
+        if not active:
+            break
+        # ---- batched BRAINSTORM over active objects (each with its OWN avoid-list) ----
+        bs_items = []
+        for i in active:
+            j, s = jobs[i], st[i]
+            avoid = "; ".join(sorted(s["seen"]))[:1600] if s["seen"] else "(none yet)"
+            bs_items.append({"user_text": TASK_BRAINSTORM_PROMPT["user"].format(
+                                 object_name=j["name"], components=s["comp_txt"], n=5,
+                                 avoid=avoid, affogato=j.get("aff_hint", "")),
+                             "image_urls": j["views"], "system_text": TASK_BRAINSTORM_PROMPT["system"],
+                             "labels": j["labels"]})
+        bs_out = [parse_json(o) for o in model.text_images_batch(bs_items)]
+        for k, i in enumerate(active):
+            bs = bs_out[k]
+            st[i]["is_scene"] = st[i]["is_scene"] or bool(bs.get("is_scene"))
+            st[i]["size_class"] = bs.get("size_class", st[i]["size_class"])
+            st[i]["_bs"] = bs
+        # ---- batched RANK over active objects ----
+        rank_items = []
+        for i in active:
+            j, s = jobs[i], st[i]; bs = s["_bs"]
+            rank_items.append({"user_text": TASK_RANK_PROMPT["user"].format(
+                                   object_name=j["name"], components=s["comp_txt"],
+                                   inter=candidates_to_text(bs.get("inter_object", [])),
+                                   intra=candidates_to_text(bs.get("intra_object", []))),
+                               "image_urls": j["views"], "system_text": TASK_RANK_PROMPT["system"],
+                               "labels": j["labels"]})
+        rank_out = [parse_json(o) for o in model.text_images_batch(rank_items)]
+        # ---- per-object accumulate + stop ----
+        for k, i in enumerate(active):
+            s = st[i]
+            added = accumulate_ranked(rank_out[k], s["inter"], s["intra"], s["seen"], s["seen_keys"])
+            if added == 0 or enough_tasks(s["inter"], s["intra"], s["is_scene"], s["size_class"], target_max):
+                s["active"] = False
+    return [assemble_tasks(jobs[i]["name"], s["is_scene"], s["size_class"], s["inter"], s["intra"],
+                           target_min, target_max) for i, s in enumerate(st)]
+
+
+def run_batched(model, batch, args, out, done, results):
+    """Batched path: process objects in windows of args.batch_size. Per window, propose + decompose each run
+    as ONE llm.generate over the whole window (vLLM continuous-batches internally -- no manual chunking).
+    Writes the file + frees temp view dirs per window. A window that raises is logged and skipped; its
+    objects are simply re-run on the next resume (they were never written, so not in `done`)."""
+    window = []   # [{obj, gi, name, comps, clean, labels, views, aff, odir}]
+
+    def write():
+        with open(out, "w") as f:
+            json.dump(results, f, indent=2, ensure_ascii=False)
+
+    def flush():
+        if not window:
+            return
+        t0 = time.time()
+        try:
+            jobs = [{"name": w["name"], "comps": w["comps"], "views": w["clean"],
+                     "labels": w["labels"], "aff_hint": w["aff"]} for w in window]
+            tasks_per = propose_tasks_batch(model, jobs, target_min=args.target_min,
+                                            target_max=args.target_max, max_rounds=args.max_rounds)
+            dec_jobs = [{"wi": wi, "name": w["name"], "comps": w["comps"], "task": t,
+                         "views": w["clean"], "labels": w["labels"]}
+                        for wi, w in enumerate(window) for t in tasks_per[wi]]
+            recs = decompose_batch(model, dec_jobs)
+            per = {wi: [] for wi in range(len(window))}
+            for job, rec in zip(dec_jobs, recs):
+                if rec:
+                    per[job["wi"]].append(rec)
+            for wi, w in enumerate(window):
+                results.append({"object_id": w["obj"]["object_id"], "object_name": w["name"],
+                                "views_used": w["views"], "components": w["comps"], "queries": per[wi]})
+                print(f"  [{w['gi']}] {w['name'][:28]:28} {len(per[wi])} queries")
+            write()
+            print(f"  [window {len(window)} objs] {time.time() - t0:.0f}s")
+        except Exception as e:                                 # a bad window shouldn't kill the run
+            print(f"  window of {len(window)} failed ({e}); recording error stubs")
+            for w in window:                                   # error record (like serial) -> run completes, no re-loop
+                results.append({"object_id": w["obj"]["object_id"], "object_name": w["name"], "error": str(e)})
+            write()
+        for w in window:
+            shutil.rmtree(w["odir"], ignore_errors=True)       # free temp views (bounded /tmp)
+        window.clear()
+
+    for i, obj in enumerate(batch):
+        gi = args.start + i
+        if obj["object_id"] in done:
+            results.append(done[obj["object_id"]])
+            continue
+        name, views = obj["object_name"], obj.get("views_used", [])
+        if not views or not all(os.path.exists(v) for v in views):
+            print(f"  [{gi}] {name[:28]:28} SKIP (views missing)")
+            continue
+        odir = os.path.join(VIEW_DIR, str(obj["object_id"]))
+        pairs = safe_prepare_views(views, odir)
+        if len(pairs) < 5:
+            print(f"  [{gi}] {name[:28]:28} SKIP (corrupt renders)")
+            shutil.rmtree(odir, ignore_errors=True)            # dir was created above -> don't leak it
+            continue
+        window.append({"obj": obj, "gi": gi, "name": name, "odir": odir, "views": views,
+                       "comps": ensure_body_component(name, obj["components"]),
+                       "aff": affogato_hint(obj["object_id"]), "clean": [p for _, p in pairs],
+                       "labels": [view_label(views[idx]) for idx, _ in pairs]})
+        if len(window) >= args.batch_size:
+            flush()
+    flush()
+    write()                                                    # final write (trailing done objects)
 
 
 def main():
@@ -791,6 +792,22 @@ def main():
     ap.add_argument("--target_min", type=int, default=3)    # hard floor (backfilled w/ grounded transforms)
     ap.add_argument("--target_max", type=int, default=5)    # cap on total tasks per object
     ap.add_argument("--max_rounds", type=int, default=2)    # agentic regenerate rounds before giving up
+    ap.add_argument("--batch_size", type=int, default=1,    # >1: batched path; = objects per window
+                    help="objects per window. A window's images must all stay resident in vLLM's encoder "
+                         "cache (max_num_batched_tokens/560 imgs) so each object's 8 views encode ONCE and "
+                         "reuse across its ~10 calls; bigger windows that overflow the cache re-encode and "
+                         "drop back to serial speed. OPTIMUM = 8 WITH --max_num_batched_tokens 40960 (64<73 "
+                         "imgs fit -> 5.5s/obj); W=16 over-squeezes KV (~5.9). Default cache: best is W=3 "
+                         "(6.6). Measured W=1 10.6, W=3 6.6, W=8+cache 5.5, W=16+cache 5.9, W=32 10.7.")
+    ap.add_argument("--gpu_mem", type=float, default=0.85,  # vLLM KV cache headroom; raise for a bigger batch
+                    help="vLLM gpu_memory_utilization (bigger -> more KV cache -> larger concurrent batch)")
+    ap.add_argument("--max_num_seqs", type=int, default=None,          # official concurrency knob (vLLM default 128)
+                    help="vLLM max concurrent requests; raise for throughput, lower if OOM/preemption")
+    ap.add_argument("--max_num_batched_tokens", type=int, default=None,  # per-step budget = multi-image encoder budget
+                    help="vLLM per-step token budget (= encoder-cache budget); raise (>8192) to relax multi-image prefill")
+    ap.add_argument("--max_new_tokens", type=int, default=2048,   # generous cap; greedy stops at EOS so it's ~free
+                    help="output token cap. Observed max real output ~258; 2048 = ample no-truncation headroom "
+                         "without a large runaway tail (avoid setting to max_model_len)")
     ap.add_argument("--model_id", default=os.environ.get("GEMMA_MODEL_ID", "google/gemma-4-26B-A4B-it"))
     args = ap.parse_args()
 
@@ -806,14 +823,14 @@ def main():
     os.chdir(REPO_ROOT)
     sys.path.insert(0, BIMANUAL_DIR)
     from gemma import Gemma
-    from get_component import make_grid
 
     objects = [o for o in json.load(open(inp)) if o.get("keep") and o.get("components")]
     end = args.end if args.end is not None else len(objects)
     batch = objects[args.start:end]
     print(f"stage1: {len(batch)} kept objects [{args.start}:{end}] of {len(objects)} -> {out}")
 
-    model = Gemma(max_new_tokens=768)   # +256 headroom for the STEP 2 operation-mechanics CoT
+    model = Gemma(max_new_tokens=args.max_new_tokens, gpu_memory_utilization=args.gpu_mem,   # gpu_mem: vLLM KV headroom
+                  max_num_seqs=args.max_num_seqs, max_num_batched_tokens=args.max_num_batched_tokens)
     results = []
     done = {}
     if os.path.exists(out):                           # resume: keep prior results, skip re-processing
@@ -825,39 +842,10 @@ def main():
                 print(f"  resume: {len(done)} objects already in {out}")
         except Exception:
             pass
-    for i, obj in enumerate(batch):
-        name, comps = obj["object_name"], obj["components"]
-        if obj.get("object_id") in done:
-            results.append(done[obj["object_id"]])
-            continue
-        comps = ensure_body_component(name, comps)   # guarantee a groundable rigid-body target
-        aff = affogato_hint(obj.get("object_id"))     # affogato manipulation cues -> brainstorm seed
-        try:
-            views = obj.get("views_used", [])
-            if not views or not all(os.path.exists(v) for v in views):
-                print(f"  [{args.start+i}] {name[:28]:28} SKIP (views missing)")
-                continue
-            pairs = safe_prepare_views(views, VIEW_DIR)
-            if len(pairs) < 5:
-                print(f"  [{args.start+i}] {name[:28]:28} SKIP (corrupt renders)")
-                continue
-            clean = [p for _, p in pairs]
-            labels = [view_label(views[idx]) for idx, _ in pairs]
-            tasks = propose_tasks(model, name, comps, clean, labels=labels,
-                                  target_min=args.target_min, target_max=args.target_max,
-                                  max_rounds=args.max_rounds, aff_hint=aff)
-            queries = [q for q in (decompose_task(model, name, comps, t, clean, labels=labels)
-                                    for t in tasks) if q]
-            results.append({"object_id": obj["object_id"], "object_name": name,
-                            "views_used": views, "components": comps, "queries": queries})
-            print(f"  [{args.start+i}] {name[:28]:28} {len(queries)} queries")
-        except Exception as e:
-            results.append({"object_id": obj.get("object_id"), "object_name": name, "error": str(e)})
-            print(f"  [{args.start+i}] ERROR {name}: {e}")
-
-        with open(out, "w") as f:
-            json.dump(results, f, indent=2, ensure_ascii=False)
-
+    if getattr(model, "backend", None) != "vllm":     # text_images_batch only truly batches on vLLM
+        print("  WARNING: backend != vLLM -> batching INACTIVE (serial speed); set GEMMA_BACKEND=vllm", flush=True)
+    print(f"  propose+decompose batched, window={args.batch_size}")
+    run_batched(model, batch, args, out, done, results)   # batch_size=1 => one object per window (serial-equivalent)
     total_q = sum(len(r.get("queries", [])) for r in results)
     print(f"\nstage1 done: {len(results)} objects, {total_q} queries -> {out}")
 

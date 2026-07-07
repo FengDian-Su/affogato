@@ -47,6 +47,8 @@ class Gemma:
         # vLLM-only knobs:
         max_model_len=32768,
         gpu_memory_utilization=0.85,
+        max_num_seqs=None,             # concurrent requests (vLLM default 128); throughput knob for batching
+        max_num_batched_tokens=None,   # per-step token budget = the encoder-cache budget too; raise (>8192)
         max_images=8,
         vision_soft_tokens=1120,     # per-image capacity (hf_overrides); per-request budget = max_soft_tokens
         max_soft_tokens=560,         # image detail (official values: 70/140/280/560/1120)
@@ -64,7 +66,8 @@ class Gemma:
 
         if self.backend == "vllm":
             self._init_vllm(model_id, max_model_len, gpu_memory_utilization,
-                            max_images, vision_soft_tokens, enforce_eager)
+                            max_images, vision_soft_tokens, enforce_eager,
+                            max_num_seqs, max_num_batched_tokens)
         else:
             self._init_transformers(model_id, dtype)
 
@@ -79,13 +82,24 @@ class Gemma:
         print("Gemma loaded!")
 
     def _init_vllm(self, model_id, max_model_len, gpu_memory_utilization,
-                   max_images, vision_soft_tokens, enforce_eager):
+                   max_images, vision_soft_tokens, enforce_eager,
+                   max_num_seqs=None, max_num_batched_tokens=None):
         # must be set before importing vllm: spawn (CUDA can't fork) + native sampler (no flashinfer JIT)
         os.environ.setdefault("VLLM_WORKER_MULTIPROC_METHOD", "spawn")
         os.environ.setdefault("VLLM_USE_FLASHINFER_SAMPLER", "0")
         from vllm import LLM
+        # Official throughput knobs (docs.vllm.ai/configuration/optimization): max_num_seqs = concurrent
+        # requests; max_num_batched_tokens = per-step token budget (ALSO the multi-image encoder-cache
+        # budget). Pass only when set so vLLM's own defaults hold otherwise. Batching itself = one
+        # llm.generate(list) with continuous batching (see text_images_batch); NO manual chunking.
+        sched = {}
+        if max_num_seqs is not None:
+            sched["max_num_seqs"] = max_num_seqs
+        if max_num_batched_tokens is not None:
+            sched["max_num_batched_tokens"] = max_num_batched_tokens
         print(f"Loading Gemma (vLLM)... ({model_id})  max_model_len={max_model_len} "
-              f"soft_tokens={self.max_soft_tokens}/{vision_soft_tokens} enforce_eager={enforce_eager}")
+              f"soft_tokens={self.max_soft_tokens}/{vision_soft_tokens} enforce_eager={enforce_eager} "
+              f"sched={sched or 'defaults'}")
         self.processor = AutoProcessor.from_pretrained(model_id, local_files_only=True)
         self.llm = LLM(
             model=model_id, max_model_len=max_model_len, trust_remote_code=True,
@@ -94,6 +108,7 @@ class Gemma:
                           "vision_soft_tokens_per_image": vision_soft_tokens},
             mm_processor_kwargs={"max_soft_tokens": self.max_soft_tokens},
             gpu_memory_utilization=gpu_memory_utilization, enforce_eager=enforce_eager,
+            **sched,
         )
         print("Gemma loaded!")
 
@@ -174,3 +189,41 @@ class Gemma:
             raw = self.processor.decode(gen, skip_special_tokens=False)
             return _parse_thinking(raw)
         return self.processor.decode(gen, skip_special_tokens=True).strip()
+
+    # ── batched (thinking OFF) ──────────
+    def text_images_batch(self, items):
+        """Batched generation for a LIST of items, each a dict {user_text, image_urls, system_text,
+        labels}. THINKING OFF (one SamplingParams for the whole batch). vLLM: ONE llm.generate over all
+        requests (continuous batching -> big throughput). transformers: falls back to a serial loop (no
+        real batching). Returns a list of output strings aligned to `items`."""
+        if not items:
+            return []
+        if self.backend != "vllm":
+            return [self.text_images(it["user_text"], it["image_urls"],
+                                     it.get("system_text", "You are a helpful assistant."),
+                                     labels=it.get("labels"), enable_thinking=False) for it in items]
+        from vllm import SamplingParams
+        reqs = []
+        for it in items:
+            content, images = [], []
+            labels = it.get("labels")
+            for i, u in enumerate(it["image_urls"]):
+                if labels and i < len(labels) and labels[i]:
+                    content.append({"type": "text", "text": labels[i]})
+                content.append({"type": "image"})
+                images.append(_load_image(u))
+            content.append({"type": "text", "text": it["user_text"]})
+            messages = [
+                {"role": "system", "content": [{"type": "text",
+                                                "text": it.get("system_text", "You are a helpful assistant.")}]},
+                {"role": "user", "content": content},
+            ]
+            prompt = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            req = {"prompt": prompt}
+            if images:
+                req["multi_modal_data"] = {"image": images}
+                req["mm_processor_kwargs"] = {"max_soft_tokens": self.max_soft_tokens}
+            reqs.append(req)
+        sp = SamplingParams(temperature=0.0, max_tokens=self.max_new_tokens, skip_special_tokens=True)
+        outs = self.llm.generate(reqs, sp, use_tqdm=False)
+        return [o.outputs[0].text.strip() for o in outs]
