@@ -3,9 +3,15 @@
 Stage 1 — task proposal + coordination-aware role decomposition + assemble.
 
 Input: stage0_filter_components.py output (kept objects with components).
-Per object:
-  B1 brainstorm tasks in two families (inter_object whole-object / intra_object part-level)
-  -> B2 rank "most daily-used first" + deterministic quota/backfill assembly (-> TOTAL tasks)
+Per object (multi-pass proposer + one strict curator; no intermediate taxonomy):
+  Round 1: broad BRAINSTORM of normal designed operations (a valid task = a normal user operation the
+     object is DESIGNED to support without damage, tools, external placement, or completing an
+     external action) in THREE families: object_level / component_level / functional_pose
+     (functional_pose = both hands put the object into a designed USE POSE - tilt to pour, hold level
+     to carry - without completing the external action or adding contents)
+  -> Rounds 2..N: RETRY rounds do a component sweep + functional-pose sweep (avoid-list = all
+     proposed + universal); a dry retry stops that object early
+  -> ONE strict CURATE composes the final set (validation / semantic dedup / family quotas)
   -> per task: role decomposition into 2 hand-agnostic robot-executable roles (+contact_region)
                + pattern + role-conditioned Molmo instructions
   -> emit a query-ready record per task.
@@ -13,11 +19,11 @@ Per object:
 Output: one entry per object: {object_id, object_name, views_used, components, queries:[...]}.
 Each query = {task, query, goal, roles, relation, pattern, molmo_queries, answer, ...}.
 
-Reuses bimanual_annotation/{gemma.py, get_component.py}. Run with the **gemma4** env.
+Reuses bimanual_annotation/gemma.py. Run with the **gemma4** env.
 
   CUDA_VISIBLE_DEVICES=3 \
   /home/michaellee/miniconda3/envs/gemma4/bin/python \
-      data_generation/stage1_task_role_assemble.py \
+      data_generation/pipeline/stage1_v2.py \
       --in outputs/stage0_filtered.json --out outputs/stage1_dataset.json
 """
 import os
@@ -26,8 +32,6 @@ import json
 import math
 import argparse
 import subprocess
-import glob
-import re
 import shutil
 import time
 
@@ -143,46 +147,6 @@ def candidates_to_text(cs):
     return "\n".join(f"- {c.get('task')} ({c.get('goal')})" for c in cs) or "- (none)"
 
 
-# affogato (the single-region dataset we extend) gives human-VERIFIED affordances per object. We inject
-# ALL of them as AFFORDANCE EVIDENCE and let the model REASON (principle-guided, NOT keyword-filtered)
-# about which are genuine manipulations to rewrite vs perception / body-use / external to ignore. No code
-# filter: a substring filter both false-drops real ops ("open to see what's inside" -> dropped on 'see')
-# and is exactly the rigid-rule style we avoid -- the guideline teaches the distinction, and the
-# downstream RANK reality-test gate enforces it.
-_AFF_ROOT = os.path.join(REPO_ROOT, "dataset", "affogato")
-
-
-def affogato_hint(object_id):
-    """All affogato queries for this object as a principle-guided AFFORDANCE-EVIDENCE block, or '' if none."""
-    if not object_id:
-        return ""
-    qs = None
-    for qf in glob.glob(os.path.join(_AFF_ROOT, "affogato_all_part*", str(object_id), "queries.json")):
-        try:
-            d = json.load(open(qf)); rec = d[0] if isinstance(d, list) else d
-            qs = rec.get("queries") if isinstance(rec, dict) else None
-        except Exception:
-            qs = None
-        if qs:
-            break
-    if not qs:
-        return ""
-    lines = "\n".join(f"  - {q}" for q in qs)
-    return (
-        "AFFORDANCE EVIDENCE - the affogato dataset (the human-annotated affordance set we extend) "
-        "recorded, for THIS exact object, the parts a person points to for everyday actions (verbatim "
-        "below). They are human-verified, so TRUST them as evidence of which parts really exist and what "
-        "the object truly affords - over any guess from the object's name. REASON about each: if it "
-        "describes a genuine MANIPULATION of the object (open / close / pour / press / turn / pull / "
-        "carry / squeeze ...), REWRITE it into a bimanual task below. If it is mere PERCEPTION (read / "
-        "look at / identify / see), BODY-USE (sit / lean / rest / wear), or needs a SEPARATE item or "
-        "surface (place it on a shelf, put an object on it, stack on top), it is NOT a manipulation of "
-        "this object alone - use it only to understand the object, do NOT make it a task. Do not copy "
-        "any verbatim.\n"
-        f"{lines}\n\n"
-    )
-
-
 def to_query(task):
     """Fixed dataset-query wrapper (affogato-parallel, task-centric, hand-free):
     'Point to the regions of the object you would use to <task>.'"""
@@ -217,7 +181,7 @@ def universal_tasks(object_name, size_class="two-handed"):
     }
     if "hand-sized" in sc:
         # a hand-sized object is moved/slid one-handed, so MOVE is not a genuine two-hand task here;
-        # its real two-handed operations (open / pour / twist / press) are part-specific -> from brainstorm.
+        # its real two-handed operations (open / pour / twist / press) come from the mechanism rounds.
         return [pick]
     move = {   # two-handed: a genuine two-hand carry (both hands needed to keep it level)
         "task": f"move the {o}", "category": "inter",
@@ -243,31 +207,6 @@ def ensure_body_component(object_name, comps):
     return [body] + list(comps)
 
 
-_GRASP_WORDS = ("pick up", "pick-up", "carry", "carrying", "lift", "lifting", "move", "moving",
-                "transport", "take", "raise", "haul")
-
-
-def is_grasp_task(task):
-    """True for whole-object grasp/transport tasks already covered by the fixed pick-up."""
-    t = str(task).lower()
-    return any(w in t for w in _GRASP_WORDS)
-
-
-# Deterministic near-duplicate key: strip the trailing bimanual qualifier clause ('... while holding
-# the base', '... using both handles'), intensity adverbs ('vigorously'), and articles, so phrasings of
-# the SAME action on the SAME part collapse to one key (a safety net under the RANK semantic dedup).
-_DK_CLAUSE = re.compile(r"\s+(while|using|with)\s+.*$")
-_DK_ADV = re.compile(r"\b(vigorously|gently|carefully|firmly|slowly|quickly|fully|completely|"
-                     r"partially|repeatedly|lightly|slightly|hard)\b")
-_DK_FILLER = re.compile(r"\b(a|an|the|its)\b")
-
-
-def dedup_key(task):
-    s = str(task).strip().lower().rstrip(".")
-    s = _DK_CLAUSE.sub("", s)
-    s = _DK_ADV.sub("", s)
-    s = _DK_FILLER.sub("", s)
-    return re.sub(r"\s+", " ", s).strip()
 
 
 _PLACEHOLDER_BITS = ("<", "...", "where hand a grips", "different place from a",
@@ -285,6 +224,8 @@ def valid_decomp(roles):
     if not isinstance(roles, list) or len(roles) != 2:
         return False
     for r in roles:
+        if not isinstance(r, dict):
+            return False
         if (_is_placeholder(r.get("role")) or _is_placeholder(r.get("target"))
                 or _is_placeholder(r.get("contact_region"))):
             return False
@@ -317,167 +258,272 @@ def molmo_instruction(role):
 
 
 # ---------------------------------------------------------------- prompts
+# Multi-pass proposer + one strict curator. NO intermediate taxonomy (seed/mechanism audits were
+# tried and each taxonomy word became a junk-legalization channel: containment->fill,
+# orientation->flip, attachment->detach-fused-parts). Coverage comes from SEARCH PRESSURE instead:
+# one broad brainstorm round + retry rounds that hunt overlooked designed operations. Core validity
+# principle everywhere: a task is a normal user operation the object is DESIGNED to support without
+# damage, tools, added objects, or external placement.
 TASK_BRAINSTORM_PROMPT = {
     "system": (
-        "You are a task planner for a two-arm (bimanual) robot. You brainstorm common daily tasks "
-        "the robot could do using ONLY its two hands and the object itself - never relying on walls, "
-        "surfaces, other objects, or tools."
+        "You are an annotation assistant for a 3D bimanual affordance dataset. "
+        "Propose daily bimanual manipulation tasks for one object. "
+        "A valid task is a normal user operation that the object is designed to support "
+        "without damage, tools, external placement, or completing an external action. "
+        "Do not generate filler tasks; returning empty lists is correct when no good task exists."
     ),
+
     "user": (
         "Object: {object_name}\n"
-        "The images are several views of this object from different angles (incl. top-down and underside).\n"
-        "Groundable parts (the robot can only contact these named parts):\n"
+        "The images show this object from multiple views.\n"
+        "Groundable components:\n"
         "{components}\n\n"
-        "{affogato}"
-        "Brainstorm daily tasks for THIS object, in TWO families:\n"
-        "A) inter_object - WHOLE-OBJECT tasks (object as one rigid unit, both hands together). "
-        "Picking it up / carrying it with two hands is ALWAYS added automatically, so do NOT list "
-        "plain pick-up / carry / lift / move. Instead propose OTHER whole-object actions ONLY IF they "
-        "are genuinely meaningful and common for THIS specific object - e.g. pour from a kettle / "
-        "pitcher / bottle, tip out a bin, flip a clamshell case. Do NOT force rotate / flip / reorient "
-        "on objects where they serve no real purpose; if no other whole-object action is meaningful, "
-        "return an EMPTY inter_object list.\n"
-        "B) intra_object - PART-LEVEL tasks: one hand HOLDS the body while the OTHER operates a movable "
-        "or functional PART (open/close a lid/flap/door, twist a cap/knob, pull a handle/drawer, press "
-        "a button/latch, slide a cover, insert/detach a part). Each MUST name a real part above.\n\n"
-        "Favour the operations people CHARACTERISTICALLY do with THIS KIND of object (e.g. a garment is "
-        "folded/rolled, a bottle/jar is opened and poured, a book is paged) that its visible parts afford.\n"
-        "Give up to {n} tasks in EACH family. Every task must be a COMMON, everyday operation people "
-        "genuinely do with this object - keep it SIMPLE, DIRECT, natural; do NOT invent unusual / "
-        "contrived tasks just to reach {n}; if only a few exist, give only those. DIVERSITY = genuinely "
-        "different ACTIONS / parts, NOT a 'left' vs 'right' mirror variant. Reworded phrasings are fine.\n"
-        "Do NOT repeat any of these ALREADY-PROPOSED tasks - propose DIFFERENT ones (or genuinely new "
-        "rewordings of yet-uncovered actions): {avoid}\n"
-        "Each task MUST:\n"
-        "- cause an object state / pose / part change with a CONCRETE end-state (reject vague "
-        "'adjust' / 'reposition' / 'arrange' goals)\n"
-        "- need TWO hands AT THE SAME TIME (no hand-to-hand handoffs / passing / regrasps)\n"
-        "- be doable with BARE HANDS only (no tool needed)\n"
-        "- be SELF-CONTAINED: two hands + this object only, no external surface / object / tool\n"
-        "- only involve the groundable parts above (intra tasks must name a real part)\n\n"
-        "If {object_name} is actually a multi-object SCENE / arrangement (e.g. a table setting, a still "
-        "life) rather than ONE rigid object, set is_scene true and return an EMPTY inter_object list "
-        "(only part-level tasks on individual items make sense).\n"
-        "Also report the object's real-world SIZE CLASS, judged from WHAT THE OBJECT IS (the views are "
-        "SIZE-NORMALIZED, do NOT read size off the image): \"hand-sized\" (one hand lifts it), "
-        "\"two-handed\" (a person lifts it with two hands), or \"furniture-scale\" (too big/heavy to "
-        "lift - it is rolled / pushed, e.g. a chest freezer, large cooler, appliance).\n"
+
+        "Current contents, if explicitly visible or listed:\n"
+        "{current_contents}\n\n"
+
+        "Already proposed tasks to avoid repeating:\n"
+        "{avoid}\n\n"
+
+        "Propose up to {n_object} object_level tasks, up to {n_component} component_level tasks, "
+        "and up to {n_pose} functional_pose tasks. These are upper bounds, not quotas.\n\n"
+
+        "Task families:\n"
+        "A) object_level: the object is manipulated mainly as a whole object. "
+        "The outcome is an intrinsic change of the object's configuration or contents already held by it. "
+        "Generic motion, placement, display, transport, or camera-facing orientation is not enough.\n"
+        "B) component_level: one or more existing components change state, configuration, access, attachment, "
+        "or relation to another part of the same object. "
+        "The component must be visible, listed, or clearly designed to move or separate.\n"
+        "C) functional_pose: the object is put into an object-side use pose that enables an external goal. "
+        "The task changes the object's own pose, shape, or functional interface, such as being level, upright, tilted, aimed, "
+        "spread, taut, opened, or aligned for use. "
+        "It does not perform the external action, add the external object/material/content, or depend on a surface or environment.\n\n"
+
+        "Think like a person using the object normally. "
+        "Look for designed operations the object visibly supports: open/close, lock/unlock, fold/unfold, roll/unroll, "
+        "extend/retract, tighten/loosen, adjust a built-in part, rotate a built-in axis, operate a handle/knob/button/plug/latch, "
+        "remove/replace a removable part, release/pour/remove contents already held by the object, "
+        "or put the object into a designed functional pose.\n\n"
+
+        "For functional_pose, prefer diverse object-side use poses when possible: "
+        "receiving, dispensing, aiming, supporting a load-bearing surface, exposing a working interface, "
+        "keeping a surface level, keeping an opening accessible, spreading a flexible body, or keeping it taut. "
+        "The goal must describe the object's pose, shape, or interface state, not how many hands hold it. "
+        "Both hands should act on the target object itself, but hand placement belongs only in why_bimanual, not in the task or goal. "
+        "Do not use functional_pose for display, inspection, placement, storage, camera-facing orientation, generic flipping, "
+        "or merely stabilizing/supporting the object without changing its object-side use pose.\n\n"
+
+        "Each task must have a concrete goal written as '<before> -> <after>'. "
+        "For object_level and component_level, the changed thing must be the object itself, an existing component, "
+        "or contents already held by the object. "
+        "For functional_pose, the changed thing must be only the object's own pose, shape, or functional interface. "
+        "A goal like '<held by one hand> -> <held by two hands>' is invalid because only the hand arrangement changes.\n\n"
+
+        "Do not propose tasks that mainly add a new liquid, material, object, workpiece, or content. "
+        "Do not propose tasks that are mainly grasping, holding without a functional pose, stabilizing, inspecting, showing, cleaning, "
+        "placing, moving, preparing, handoff, blocking, obstructing, changing viewpoint/pose for visibility, "
+        "or detaching fixed structural parts.\n\n"
+
+        "Prefer component_level tasks when meaningful components exist. "
+        "Use functional_pose only for natural bimanual use poses that the object clearly supports. "
+        "If the object has several designed operations, include several distinct tasks. "
+        "If it has only one or two real operations, return only those.\n\n"
+
+        "Set is_scene true only if the input is a multi-object scene rather than one object.\n"
+        "Report size_class from real-world knowledge of the object: "
+        "\"hand-sized\", \"two-handed\", or \"furniture-scale\".\n\n"
+
         "Return JSON only:\n"
-        "{{\n  \"is_scene\": false,\n  \"size_class\": \"hand-sized | two-handed | furniture-scale\",\n"
-        "  \"inter_object\": [ {{\"task\": \"...\", \"goal\": \"<before> -> <after>\"}} ],\n"
-        "  \"intra_object\": [ {{\"task\": \"...\", \"goal\": \"<before> -> <after>\"}} ]\n}}\n"
+        "{{\n"
+        "  \"is_scene\": false,\n"
+        "  \"size_class\": \"hand-sized | two-handed | furniture-scale\",\n"
+        "  \"object_level\": [\n"
+        "    {{\"task\": \"...\", \"goal\": \"<before> -> <after>\"}}\n"
+        "  ],\n"
+        "  \"component_level\": [\n"
+        "    {{\"task\": \"...\", \"goal\": \"<before> -> <after>\"}}\n"
+        "  ],\n"
+        "  \"functional_pose\": [\n"
+        "    {{\"task\": \"...\", \"goal\": \"<before> -> <after>\"}}\n"
+        "  ]\n"
+        "}}\n"
         "Output JSON only."
     ),
 }
 
-TASK_RANK_PROMPT = {
+TASK_BRAINSTORM_RETRY_PROMPT = {
     "system": (
-        "You curate a two-arm (bimanual) robot manipulation dataset. You validate candidate tasks "
-        "and rank them by how common/everyday they are (MOST daily-used first)."
+        "You are an annotation assistant for a 3D bimanual affordance dataset. "
+        "Find overlooked daily bimanual tasks for one object. "
+        "A valid task is a normal user operation that the object is designed to support "
+        "without damage, tools, external placement, or completing an external action. "
+        "Return only new valid tasks, not variations of existing ones."
     ),
+
     "user": (
         "Object: {object_name}\n"
-        "Groundable parts:\n{components}\n\n"
-        "inter_object candidates (other meaningful whole-object actions):\n{inter}\n\n"
-        "intra_object candidates (part-level):\n{intra}\n\n"
-        "For EACH family: drop any task that breaks a rule OR is not genuinely meaningful for THIS "
-        "object, then RANK survivors MOST DAILY-USED / most common FIRST. A valid task MUST:\n"
-        "- need TWO hands at the same time (no handoffs / passing / regrasps)\n"
-        "- be SELF-CONTAINED (two hands + this object only; no walls / surfaces / other objects / tools)\n"
-        "- REALITY TEST (DROP if it fails any): (1) does a real person do this BARE-HANDED and routinely to "
-        "THIS object? (2) does the end-state need anything NOT in the scene (a vessel to pour into, a "
-        "second object, a person)? (3) does it require defeating a seal/tape/shrink-wrap (= a tool)? (4) is "
-        "it a genuine STATE CHANGE, not 'after' == 'before'? A pour / empty presupposes a real interior "
-        "cavity + opening - reject it on a solid or sealed body.\n"
-        "- cause an object state / pose / part change, and not be solvable by one hand alone\n"
-        "- only involve the groundable parts above\n"
-        "- be BARE-HANDS doable (DROP anything needing a tool OR a KEY: wrench/screwdriver/tape/knife, "
-        "and padlock/keyed-lock unlock/lock) and have a CONCRETE end-state (DROP vague 'adjust'/"
-        "'reposition'/'arrange' tasks)\n"
-        "- be a SINGLE coordinated action (DROP compound / sequential tasks that need two ordered steps, "
-        "e.g. 'close and latch the lid', 'fold then tuck' - keep only the one operation)\n"
-        "For inter_object specifically, DROP any plain pick-up / carry / lift / move (added separately) "
-        "and DROP rotate / flip / reorient UNLESS they are genuinely meaningful for this object.\n"
-        "Keep tasks simple and natural. If two surviving tasks perform the SAME action on the SAME part - "
-        "differing only in wording, an added qualifier, or intensity - keep just the single clearest one; "
-        "keep both only when the ACTION or the TARGET PART genuinely differs.\n\n"
-        "JUSTIFICATION (why_bimanual): give a CONCRETE physical reason specific to THIS object, in ONE "
-        "of two forms: (a) ASYMMETRIC - one hand must HOLD/steady one named part while the OTHER hand "
-        "operates a DIFFERENT named part (name both parts); or (b) SYMMETRIC - the object must be gripped "
-        "at two DISTINCT, OPPOSITE outer regions at the same time to keep it level/balanced. The bare "
-        "words 'large', 'heavy', or 'awkward' are BANNED as a justification - if the only reason you can "
-        "give is that the object is big or heavy, and one hand could in fact do it, the task is NOT "
-        "bimanual: DROP it.\n\n"
-        "Return JSON only (each family ranked, most-daily-used first):\n"
-        "{{\n  \"inter_object\": [ {{\"task\": \"...\", \"goal\": \"<before> -> <after>\", "
-        "\"why_bimanual\": \"what fails with one hand\"}} ],\n"
-        "  \"intra_object\": [ {{\"task\": \"...\", \"goal\": \"<before> -> <after>\", "
-        "\"why_bimanual\": \"what fails with one hand\"}} ]\n}}\n"
+        "The images show this object from multiple views.\n"
+        "Groundable components:\n"
+        "{components}\n\n"
+
+        "Current contents, if explicitly visible or listed:\n"
+        "{current_contents}\n\n"
+
+        "Already accepted or proposed tasks:\n"
+        "{avoid}\n\n"
+
+        "Do a component sweep: for each visible or listed component, ask whether an ordinary person would operate it by hand. "
+        "Look especially for handles, knobs, buttons, plugs, caps, lids, flaps, hinges, latches, clasps, straps, pages, folds, seams, "
+        "sliders, adjustable parts, removable parts, or built-in rotating parts. "
+        "Skip fixed structural parts.\n\n"
+
+        "Also do a functional-pose sweep: ask whether two hands would naturally put the object into an object-side use pose "
+        "for receiving, dispensing, aiming, supporting a load-bearing surface, exposing a working interface, keeping a surface level, "
+        "keeping an opening accessible, spreading a flexible body, or keeping it taut. "
+        "The task may mention the external goal, but the goal must change the object's own pose, shape, or functional interface. "
+        "It must not merely change how the hands hold, support, or stabilize the object, and it must not complete the external action.\n\n"
+
+        "Task families:\n"
+        "A) object_level: whole-object intrinsic configuration or already-held-content change. "
+        "Generic motion, placement, display, transport, or camera-facing orientation is not enough.\n"
+        "B) component_level: existing components change state, configuration, access, attachment, or relation to another part of the same object.\n"
+        "C) functional_pose: the object is put into a designed use pose or functional condition. "
+        "Both hands should act on the target object itself, and the pose must involve a functional interface of the object.\n\n"
+
+        "Each task must have a concrete '<before> -> <after>' goal verifiable from the object itself. "
+        "The task must describe the intended object outcome or object-side use pose, not hand placement or role decomposition.\n\n"
+
+        "Reject tasks involving new objects, new materials, new contents, tools, surfaces, people, environments, "
+        "showing, inspecting, cleaning, placing, moving, preparing, blocking, obstructing, stabilizing, handoff, "
+        "viewpoint/pose changes for visibility, detaching fixed structural parts, or completing the external action itself. "
+        "Reject goals where the only change is hand arrangement, such as one-hand to two-hand holding or "
+        "unsupported to hand-stabilized.\n\n"
+
+        "Propose up to {n_object} additional object_level tasks, up to {n_component} additional component_level tasks, "
+        "and up to {n_pose} additional functional_pose tasks. Return empty lists if no overlooked valid tasks exist.\n\n"
+
+        "Return JSON only:\n"
+        "{{\n"
+        "  \"object_level\": [\n"
+        "    {{\"task\": \"...\", \"goal\": \"<before> -> <after>\"}}\n"
+        "  ],\n"
+        "  \"component_level\": [\n"
+        "    {{\"task\": \"...\", \"goal\": \"<before> -> <after>\"}}\n"
+        "  ],\n"
+        "  \"functional_pose\": [\n"
+        "    {{\"task\": \"...\", \"goal\": \"<before> -> <after>\"}}\n"
+        "  ]\n"
+        "}}\n"
+        "Output JSON only."
+    ),
+}
+
+TASK_CURATE_PROMPT = {
+    "system": (
+        "You are a strict curator for a 3D bimanual affordance dataset. "
+        "Keep only realistic daily bimanual tasks. "
+        "A valid task is a normal user operation that the object is designed to support "
+        "without damage, tools, external placement, or completing an external action. "
+        "When uncertain, reject."
+    ),
+
+    "user": (
+        "Object: {object_name}\n\n"
+
+        "Groundable components:\n"
+        "{components}\n\n"
+
+        "Current contents, if explicitly visible or listed:\n"
+        "{current_contents}\n\n"
+
+        "Fixed tasks already in the final set. Do not repeat or rephrase them:\n"
+        "{universal}\n\n"
+
+        "Raw candidate tasks:\n"
+        "object_level candidates:\n"
+        "{object_level}\n\n"
+        "component_level candidates:\n"
+        "{component_level}\n\n"
+        "functional_pose candidates:\n"
+        "{functional_pose}\n\n"
+
+        "Compose the final task list.\n\n"
+
+        "Task families:\n"
+        "A) object_level: the object is manipulated mainly as a whole object. "
+        "The outcome is an intrinsic change of the object's configuration or contents already held by it. "
+        "Generic motion, placement, display, transport, or camera-facing orientation is not enough.\n"
+        "B) component_level: one or more existing components change state, configuration, access, attachment, "
+        "or relation to another part of the same object. "
+        "The component must be visible, listed, or clearly designed to move or separate.\n"
+        "C) functional_pose: the object is put into an object-side use pose that enables an external goal. "
+        "The task changes the object's own pose, shape, or functional interface, such as being level, upright, tilted, aimed, "
+        "spread, taut, opened, or aligned for use. "
+        "It does not perform the external action, add the external object/material/content, or depend on a surface or environment.\n\n"
+
+        "Keep a candidate only if:\n"
+        "- its goal is a concrete '<before> -> <after>' change verifiable from the object itself;\n"
+        "- it is a normal operation an ordinary person would intentionally do to this object;\n"
+        "- the object visibly supports the change without damage;\n"
+        "- for object_level or component_level, the changed thing is the object itself, an existing component, "
+        "or contents already held by the object;\n"
+        "- for functional_pose, the changed thing is only the object's own pose, shape, or functional interface; "
+        "both hands act on the target object, but the task/goal must not be about hand arrangement; "
+        "the external goal is not completed by the task;\n"
+        "- it naturally requires or strongly benefits from two hands;\n"
+        "- it is not already covered by a fixed task or another kept task.\n\n"
+
+        "Reject tasks whose main outcome is adding a new liquid, material, object, workpiece, or content. "
+        "Reject showing, inspecting, cleaning, placing, storing, transporting, generic flipping, camera-facing orientation, "
+        "hand placement, grasping, stabilization, blocking, obstructing, vague preparation, handoff, "
+        "new tools/surfaces/environments, detaching fixed structural parts, or completing an external action itself.\n\n"
+
+        "Reject functional_pose tasks whose before-to-after goal only changes the hand arrangement, "
+        "such as one-hand to two-hand holding, unsupported to hand-stabilized, or one hand on part A and another hand on part B. "
+        "Hand contact details belong in why_bimanual, not in the task or goal.\n\n"
+
+        "For functional_pose, keep diverse pose types when possible instead of many upright/tilt variants. "
+        "Prefer poses involving receiving, dispensing, aiming, supporting, exposing a working interface, keeping a surface level, "
+        "keeping an opening accessible, or keeping a flexible body taut. "
+        "Reject functional_pose tasks that are merely display, inspection, placement, or viewpoint change.\n\n"
+
+        "Prioritize component_level tasks because they are the main focus of the dataset. "
+        "Keep object_level tasks when they add meaningful object-intrinsic diversity. "
+        "Keep functional_pose tasks only when they are natural bimanual use poses and not display/placement/viewpoint tasks. "
+        "Keep up to {n_component} component_level tasks, up to {n_object} object_level tasks, "
+        "and up to {n_pose} functional_pose tasks. Return fewer if fewer valid tasks exist.\n\n"
+
+        "Rewrite kept tasks into simple daily task phrases. "
+        "Order component_level tasks first, then object_level tasks, then functional_pose tasks.\n\n"
+
+        "Return JSON only:\n"
+        "{{\n"
+        "  \"tasks\": [\n"
+        "    {{\n"
+        "      \"task\": \"...\",\n"
+        "      \"goal\": \"<before> -> <after>\",\n"
+        "      \"why_bimanual\": \"...\",\n"
+        "      \"category\": \"object_level | component_level | functional_pose\"\n"
+        "    }}\n"
+        "  ]\n"
+        "}}\n"
         "Output JSON only."
     ),
 }
 
 
 # ---------------------------------------------------------------- per-object pipeline
-def whole_object_fillers(object_name, size_class):
-    """GROUNDED whole-object transforms used ONLY to reach the hard floor on part-poor objects, WITHOUT
-    hallucinating a part. Every hand-liftable rigid body can be turned over / reoriented with two hands,
-    each grounding to two OPPOSITE faces (a clean co-rotate two-region target) - honest-but-generic, never
-    a fake lid/cap. Furniture-scale returns none (can't flip a freezer)."""
-    o = str(object_name).strip()
-    if "furniture" in str(size_class).lower():
-        return []
-    return [
-        {"task": f"turn over the {o}", "category": "inter",
-         "goal": f"{o} resting on its base -> {o} rotated end-over-end to rest on the opposite face",
-         "why_bimanual": ("both hands grip two opposite faces and apply matched torque to flip it; one "
-                          "hand cannot rotate it without it slipping or dropping")},
-        {"task": f"reorient the {o}", "category": "inter",
-         "goal": f"{o} at one facing -> {o} rotated in the hands to a new facing",
-         "why_bimanual": ("both hands hold two opposite faces and turn it together to change its facing "
-                          "while keeping it level")},
-    ]
 
-
-def accumulate_ranked(ranked, inter, intra, seen, seen_keys):
-    """Add a RANK round's survivors into the inter/intra pools, deduped (exact string + normalized
-    dedup_key + transport filter). Mutates the pools/sets in place; returns how many were added."""
-    added = 0
-    for fam, pool, cat in (("inter_object", inter, "inter"), ("intra_object", intra, "intra")):
-        for t in ranked.get(fam, []):
-            k = str(t.get("task", "")).strip().lower(); dk = dedup_key(k)
-            if k and dk not in seen_keys and not is_grasp_task(k):   # transport is whole-body, never a pool task
-                pool.append(dict(t, category=cat)); seen.add(k); seen_keys.add(dk); added += 1
-    return added
-
-
-def enough_tasks(inter, intra, is_scene, size_class, target_max):
-    """Stop condition: scene, or the pools already fill every non-universal slot up to target_max."""
-    n_uni = 2 if "two-handed" in str(size_class).lower() else 1   # universal tasks fill that many slots
-    return is_scene or len(inter) + len(intra) >= max(0, target_max - n_uni)
-
-
-def assemble_tasks(name, is_scene, size_class, inter, intra, target_min, target_max):
-    """Universal transport leads -> ranked brainstormed fill (cap target_max) -> hard-floor backfill with
-    GROUNDED whole-object transforms (never a fabricated part) -> attach the query wrapper. Shared logic."""
-    base = [] if is_scene else universal_tasks(name, size_class)
-    tasks = (base + inter + intra)[:target_max]
-    if not is_scene:
-        have = {dedup_key(t.get("task", "")) for t in tasks}
-        for f in whole_object_fillers(name, size_class):
-            if len(tasks) >= target_min:
-                break
-            if dedup_key(f["task"]) not in have:
-                tasks.append(f); have.add(dedup_key(f["task"]))
-        tasks = tasks[:target_max]
-    for t in tasks:
-        t["query"] = to_query(t.get("task", ""))
-    return tasks
+# Family quota: at most this many whole-object (inter) tasks per object, universal transport INCLUDED,
+# so the rest of the budget is GUARANTEED to part-level (intra) tasks - the dataset's core examples.
+# Without this quota the intra share measurably collapses (45% -> 30%, part0 audit 2026-07-08).
+INTER_CAP = 3
 
 
 # ---- FACTORED decomposition: call 1 derives the operation-mechanics PLAN (focused physics, no role
-# formatting), call 2 GROUNDS that plan into two roles. Isolating the physics keeps a 12B from letting
-# the big formatting prompt dilute its reasoning (probe: it reasons latches correctly when focused).
+# formatting), call 2 GROUNDS that plan into two roles. Isolating the physics keeps the model from
+# letting the big formatting prompt dilute its reasoning (probe: latches reasoned correctly when focused).
 OP_PLAN_PROMPT = {
     "system": (
         "You are a manipulation-mechanics expert. For ONE task on ONE object you work out ONLY the "
@@ -493,8 +539,9 @@ OP_PLAN_PROMPT = {
         "reconfigure - the whole body, a part, or the CONTENTS inside - and what must stay FIXED as the "
         "reference. If the goal moves the CONTENTS (pour / empty / tip out), the contents are the moving "
         "element and the BODY is the stable frame: one hand anchors the body, the other tilts it - do NOT "
-        "have both hands rotate the whole body. Name the rigid BODY and which SINGLE part, if any, must "
-        "MOVE (or 'nothing moves' for a plain carry/flip/move); (b) the object's real-world SIZE CLASS, "
+        "have both hands rotate the whole body. Name the rigid BODY and which part, if any, must MOVE - "
+        "usually ONE part; a MATCHING PAIR (two flaps, two handles) when the task drives both at once "
+        "(or 'nothing moves' for a plain carry/flip/move); (b) the object's real-world SIZE CLASS, "
         "judged from WHAT THE OBJECT IS (views are SIZE-NORMALIZED, do not read size off the image): "
         "hand-sized / two-handed / furniture-scale.\n"
         "STEP 2 - OPERATION MECHANICS (only if a part MOVES):\n"
@@ -512,10 +559,13 @@ OP_PLAN_PROMPT = {
         "jar the cap screws into, the OPPOSITE side) - a DIFFERENT part from the acting one. A true anchor "
         "STAYS STATIONARY while the acting part moves: a contact that travels and rotates WITH the body is "
         "NOT an anchor. For a tilt / pour / empty, the anchor is the BASE / bottom (the pivot that stays "
-        "put) while the other hand tilts the upper body.\n"
-        "STEP 3 - COORDINATION follows directly from STEP 1: a PART moves on the otherwise-fixed body -> "
-        "'stabilize+actuate' (one hand holds the frame, the other works the part); the body splits into two "
-        "halves that pull APART in opposite directions -> 'co-actuate'; NOTHING moves on the object - a "
+        "put) while the other hand tilts the upper body. EXCEPTION - a MATCHING PAIR driven together: "
+        "there is no stationary anchor; each hand drives its own part of the pair and each is the other's "
+        "reaction (set purchase_contact = one part of the pair, reaction_part = its twin).\n"
+        "STEP 3 - COORDINATION follows directly from STEP 1: ONE part moves on the otherwise-fixed body -> "
+        "'stabilize+actuate' (one hand holds the frame, the other works the part); BOTH hands drive moving "
+        "parts at once - a matching PAIR (two flaps, two handles, opposite twists) or two halves pulled "
+        "APART - -> 'co-actuate'; NOTHING moves on the object - a "
         "plain lift / carry / flip / push of the whole rigid body - -> 'whole-body'. A pick-up / carry is "
         "always 'whole-body' (the object is one rigid unit; nothing on it moves). A whole-body LIFT is a "
         "CO-LIFT by DEFAULT: two hands grip two OPPOSITE faces (or two handles) and raise together - "
@@ -560,8 +610,10 @@ GROUND_PROMPT = {
         "jug's loop - then THAT hand 'lift's the grip and the OTHER merely 'hold's the body "
         "to steady it. When unsure, default to BOTH 'lift' two OPPOSITE faces. furniture-scale that cannot be raised "
         "-> both 'push' the body (verb 'push').\n"
-        "- coordination 'co-actuate': both hands actively pull/separate the two halves in OPPOSITE "
-        "directions.\n"
+        "- coordination 'co-actuate': BOTH hands actively drive moving parts at the same time - each "
+        "works its own part of a matching pair (plan.purchase_contact and plan.reaction_part, e.g. two "
+        "flaps, two handles), or the two halves are pulled APART in opposite directions. Neither hand is "
+        "a passive 'hold'.\n"
         "Each role: role (allowed verb), target (a visible part, verbatim), contact_region (a specific "
         "spot ON that hand's OWN target; the two regions must be DIFFERENT places - opposite faces for a "
         "symmetric grip), function. Never actuate a part fused/rigid to the body. Every contact_region "
@@ -610,10 +662,8 @@ def build_query_record(task, plan, plan_txt, dec):
     }
 
 
-# ---- BATCHED stage (option B): both propose (propose_tasks_batch) and decompose (decompose_batch) run
-# ONE llm.generate over MANY jobs at once (vLLM continuous batching). Same OP_PLAN->GROUND logic as the
-# serial path, just batched. Verified no cross-request image contamination (scratchpad/vllm_batch_verify.py:
-# 0/17). Records are built by the shared build_query_record, identical to serial.
+# ---- BATCHED decompose: each phase runs ONE llm.generate over MANY jobs at once (vLLM continuous
+# batching). Verified no cross-request image contamination (scratchpad/vllm_batch_verify.py: 0/17).
 def decompose_batch(model, jobs):
     """jobs: list of {name, comps, task, views, labels}. Returns query records aligned to jobs (None=drop).
     Phase 1 = batched OP_PLAN (thinking off); Phase 2 = batched GROUND; Phase 3 = re-batch the GROUNDs that
@@ -663,54 +713,113 @@ def decompose_batch(model, jobs):
     return out
 
 
-def propose_tasks_batch(model, jobs, target_min=3, target_max=5, max_rounds=2):
-    """BATCHED multi-object propose. Each round runs ONE batched BRAINSTORM + ONE batched RANK over all
-    ACTIVE objects (each = one model.text_images_batch = one llm.generate over the whole active list; vLLM
-    continuous-batches internally), then per-object accumulate + stop-check with INDEPENDENT per-object state
-    (no cross-object contamination). jobs: list of {name, comps, views, labels, aff_hint}. Returns task-lists
-    aligned to jobs."""
-    st = [{"comp_txt": components_to_text(j["comps"]), "inter": [], "intra": [], "seen": set(),
-           "seen_keys": set(), "is_scene": False, "size_class": "two-handed", "active": True, "_bs": {}}
-          for j in jobs]
-    for _ in range(max_rounds):
+POSE_CAP = 3      # functional_pose is a supplement for low-capacity objects, never the main course
+
+
+def propose_tasks_batch(model, jobs, n_component=6, max_rounds=3):
+    """BATCHED multi-pass propose + ONE strict curate. Round 1: broad batched BRAINSTORM (also reports
+    is_scene / size_class). Rounds 2..max_rounds: batched RETRY doing a component sweep + a
+    functional-pose sweep (avoid-list = everything already proposed + the fixed universal tasks); an
+    object whose retry adds nothing is dry and stops early. Finally ONE batched CURATE composes each
+    object's set - the LLM does all validation / semantic dedup; code only exact-string-dedups and
+    enforces the INTER_CAP / POSE_CAP family quotas. Three families: object_level(inter) /
+    component_level(intra) / functional_pose(pose) - pose tasks change only the object-side use pose.
+    jobs: list of {name, comps, views, labels}. Returns task-lists aligned to jobs."""
+    fam2cat = {"object_level": "inter", "component_level": "intra", "functional_pose": "pose"}
+    fams = tuple(fam2cat.items())
+    # stage0 has no separate contents annotation -> the model infers contents from what it sees
+    contents_note = "(not separately annotated; infer only from the images and listed components)"
+    st = [{"comp_txt": components_to_text(j["comps"]), "inter": [], "intra": [], "pose": [],
+           "seen": set(), "is_scene": False, "size_class": "two-handed", "active": True} for j in jobs]
+
+    def pool(s, bs):
+        """Accumulate one round's candidates (exact-string dedup only). Returns #added."""
+        added = 0
+        for fam, cat in fams:
+            for t in bs.get(fam) or []:
+                if not isinstance(t, dict):                # schema-deviant item must not kill the window
+                    continue
+                k = str(t.get("task", "")).strip().lower()
+                if not k or k in s["seen"]:
+                    continue
+                s["seen"].add(k)
+                s[cat].append(dict(t, category=cat))
+                added += 1
+        return added
+
+    for rnd in range(max_rounds):
         active = [i for i, s in enumerate(st) if s["active"]]
         if not active:
             break
-        # ---- batched BRAINSTORM over active objects (each with its OWN avoid-list) ----
+        prompt = TASK_BRAINSTORM_PROMPT if rnd == 0 else TASK_BRAINSTORM_RETRY_PROMPT
         bs_items = []
         for i in active:
             j, s = jobs[i], st[i]
-            avoid = "; ".join(sorted(s["seen"]))[:1600] if s["seen"] else "(none yet)"
-            bs_items.append({"user_text": TASK_BRAINSTORM_PROMPT["user"].format(
-                                 object_name=j["name"], components=s["comp_txt"], n=5,
-                                 avoid=avoid, affogato=j.get("aff_hint", "")),
-                             "image_urls": j["views"], "system_text": TASK_BRAINSTORM_PROMPT["system"],
+            # avoid the universal transport tasks from the start (both exist for every size_class)
+            uni = [f"pick up the {j['name']}", f"move the {j['name']}"]
+            avoid = "; ".join(sorted(s["seen"]) + uni)[:1600]
+            bs_items.append({"user_text": prompt["user"].format(
+                                 object_name=j["name"], components=s["comp_txt"],
+                                 current_contents=contents_note, avoid=avoid,
+                                 n_object=4 if rnd == 0 else 3,
+                                 n_component=6 if rnd == 0 else 5,
+                                 n_pose=3 if rnd == 0 else 4),   # retry offers extra pose candidates;
+                                                                 # the curator still keeps <= POSE_CAP
+                             "image_urls": j["views"], "system_text": prompt["system"],
                              "labels": j["labels"]})
         bs_out = [parse_json(o) for o in model.text_images_batch(bs_items)]
         for k, i in enumerate(active):
-            bs = bs_out[k]
-            st[i]["is_scene"] = st[i]["is_scene"] or bool(bs.get("is_scene"))
-            st[i]["size_class"] = bs.get("size_class", st[i]["size_class"])
-            st[i]["_bs"] = bs
-        # ---- batched RANK over active objects ----
-        rank_items = []
-        for i in active:
-            j, s = jobs[i], st[i]; bs = s["_bs"]
-            rank_items.append({"user_text": TASK_RANK_PROMPT["user"].format(
-                                   object_name=j["name"], components=s["comp_txt"],
-                                   inter=candidates_to_text(bs.get("inter_object", [])),
-                                   intra=candidates_to_text(bs.get("intra_object", []))),
-                               "image_urls": j["views"], "system_text": TASK_RANK_PROMPT["system"],
-                               "labels": j["labels"]})
-        rank_out = [parse_json(o) for o in model.text_images_batch(rank_items)]
-        # ---- per-object accumulate + stop ----
-        for k, i in enumerate(active):
-            s = st[i]
-            added = accumulate_ranked(rank_out[k], s["inter"], s["intra"], s["seen"], s["seen_keys"])
-            if added == 0 or enough_tasks(s["inter"], s["intra"], s["is_scene"], s["size_class"], target_max):
+            s, bs = st[i], bs_out[k]
+            if "error" in bs:                              # transient parse failure: keep active, the
+                continue                                   # next round retries (round 1 fields defaulted)
+            if rnd == 0:
+                s["is_scene"] = bool(bs.get("is_scene"))
+                s["size_class"] = bs.get("size_class", s["size_class"])
+            if pool(s, bs) == 0 and rnd > 0:               # a dry RETRY round -> another one won't help
                 s["active"] = False
-    return [assemble_tasks(jobs[i]["name"], s["is_scene"], s["size_class"], s["inter"], s["intra"],
-                           target_min, target_max) for i, s in enumerate(st)]
+
+    # ---- ONE batched CURATE: LLM validates + semantically dedups + composes the final set ----
+    bases, cur_items = [], []
+    for i, j in enumerate(jobs):
+        s = st[i]
+        base = [] if s["is_scene"] else universal_tasks(j["name"], s["size_class"])
+        bases.append(base)
+        cur_items.append({"user_text": TASK_CURATE_PROMPT["user"].format(
+                              object_name=j["name"], components=s["comp_txt"],
+                              current_contents=contents_note,
+                              universal=candidates_to_text(base),
+                              object_level=candidates_to_text(s["inter"]),
+                              component_level=candidates_to_text(s["intra"]),
+                              functional_pose=candidates_to_text(s["pose"]),
+                              n_component=n_component,
+                              n_object=max(0, INTER_CAP - len(base)),
+                              n_pose=POSE_CAP),
+                          "image_urls": j["views"], "system_text": TASK_CURATE_PROMPT["system"],
+                          "labels": j["labels"]})
+    cur_out = [parse_json(o) for o in model.text_images_batch(cur_items)]
+    out = []
+    for base, cur in zip(bases, cur_out):
+        existing = {str(t.get("task", "")).strip().lower() for t in base}
+        n_cat = {"inter": len(base), "pose": 0}
+        cap = {"inter": INTER_CAP, "pose": POSE_CAP}
+        tasks = list(base)
+        for t in cur.get("tasks") or []:
+            if not isinstance(t, dict):
+                continue
+            k = str(t.get("task", "")).strip().lower()
+            if not k or k in existing:                     # exact dup of a fixed task only; semantic
+                continue                                   # dedup is the curator's job
+            cat = fam2cat.get(t.get("category"), "inter")
+            if cat in cap:                                 # hard family caps even if the curator
+                if n_cat[cat] >= cap[cat]:                 # disobeys its quotas (intra-collapse /
+                    continue                               # pose-flood guards)
+                n_cat[cat] += 1
+            existing.add(k)
+            tasks.append(dict(t, category=cat))
+        for t in tasks:
+            t["query"] = to_query(t.get("task", ""))
+        out.append(tasks)
+    return out
 
 
 def run_batched(model, batch, args, out, done, results):
@@ -718,7 +827,7 @@ def run_batched(model, batch, args, out, done, results):
     as ONE llm.generate over the whole window (vLLM continuous-batches internally -- no manual chunking).
     Writes the file + frees temp view dirs per window. A window that raises is logged and skipped; its
     objects are simply re-run on the next resume (they were never written, so not in `done`)."""
-    window = []   # [{obj, gi, name, comps, clean, labels, views, aff, odir}]
+    window = []   # [{obj, gi, name, comps, clean, labels, views, odir}]
 
     def write():
         with open(out, "w") as f:
@@ -730,9 +839,9 @@ def run_batched(model, batch, args, out, done, results):
         t0 = time.time()
         try:
             jobs = [{"name": w["name"], "comps": w["comps"], "views": w["clean"],
-                     "labels": w["labels"], "aff_hint": w["aff"]} for w in window]
-            tasks_per = propose_tasks_batch(model, jobs, target_min=args.target_min,
-                                            target_max=args.target_max, max_rounds=args.max_rounds)
+                     "labels": w["labels"]} for w in window]
+            tasks_per = propose_tasks_batch(model, jobs, n_component=args.n_component,
+                                            max_rounds=args.max_rounds)
             dec_jobs = [{"wi": wi, "name": w["name"], "comps": w["comps"], "task": t,
                          "views": w["clean"], "labels": w["labels"]}
                         for wi, w in enumerate(window) for t in tasks_per[wi]]
@@ -743,7 +852,8 @@ def run_batched(model, batch, args, out, done, results):
                     per[job["wi"]].append(rec)
             for wi, w in enumerate(window):
                 results.append({"object_id": w["obj"]["object_id"], "object_name": w["name"],
-                                "views_used": w["views"], "components": w["comps"], "queries": per[wi]})
+                                "views_used": w["views"], "components": w["comps"],
+                                "queries": per[wi]})
                 print(f"  [{w['gi']}] {w['name'][:28]:28} {len(per[wi])} queries")
             write()
             print(f"  [window {len(window)} objs] {time.time() - t0:.0f}s")
@@ -773,7 +883,7 @@ def run_batched(model, batch, args, out, done, results):
             continue
         window.append({"obj": obj, "gi": gi, "name": name, "odir": odir, "views": views,
                        "comps": ensure_body_component(name, obj["components"]),
-                       "aff": affogato_hint(obj["object_id"]), "clean": [p for _, p in pairs],
+                       "clean": [p for _, p in pairs],
                        "labels": [view_label(views[idx]) for idx, _ in pairs]})
         if len(window) >= args.batch_size:
             flush()
@@ -789,9 +899,12 @@ def main():
     ap.add_argument("--start", type=int, default=0)
     ap.add_argument("--end", type=int, default=None)
     ap.add_argument("--gpu", default=None)
-    ap.add_argument("--target_min", type=int, default=3)    # hard floor (backfilled w/ grounded transforms)
-    ap.add_argument("--target_max", type=int, default=5)    # cap on total tasks per object
-    ap.add_argument("--max_rounds", type=int, default=2)    # agentic regenerate rounds before giving up
+    ap.add_argument("--n_component", type=int, default=6)   # component (intra) tasks the curator may keep
+                                                            # per object; + 1-2 universal + <=INTER_CAP
+                                                            # extra inter -> ~5-8 tasks on rich objects,
+                                                            # honest fewer on simple ones
+    ap.add_argument("--max_rounds", type=int, default=3)    # brainstorm rounds: 1 broad + (max_rounds-1)
+                                                            # coverage retries; a dry retry stops early
     ap.add_argument("--batch_size", type=int, default=1,    # >1: batched path; = objects per window
                     help="objects per window. A window's images must all stay resident in vLLM's encoder "
                          "cache (max_num_batched_tokens/560 imgs) so each object's 8 views encode ONCE and "
@@ -836,7 +949,7 @@ def main():
     if os.path.exists(out):                           # resume: keep prior results, skip re-processing
         try:
             for r in json.load(open(out)):
-                if r.get("object_id"):
+                if r.get("object_id") and not r.get("error"):   # error stubs are NOT done -> re-run them
                     done[r["object_id"]] = r
             if done:
                 print(f"  resume: {len(done)} objects already in {out}")
