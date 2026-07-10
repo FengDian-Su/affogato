@@ -45,7 +45,11 @@ def parse_args():
     ap.add_argument("--gpu", default="3")
     ap.add_argument("--num_views", type=int, default=40)
     ap.add_argument("--k", type=int, default=4)        # views per Molmo prompt
-    ap.add_argument("--batch", type=int, default=4)    # prompts per generate (4 = shared-GPU safe)
+    # prompts per generate. Swept 2026-07-10 (40-view role, GPU3): B=6 -> 0.227s/view
+    # (peak 60GiB, safe next to a ~27GiB neighbour); B=12 -> 0.178s/view (peak 70GiB,
+    # exclusive-GPU only; >=10 means one generate per 40-view role). Hit sets identical
+    # to B=1 at every B; needs expandable_segments (set in main) to avoid fragmentation OOM.
+    ap.add_argument("--batch", type=int, default=6)
     ap.add_argument("--skip_existing", action="store_true")
     return ap.parse_args()
 
@@ -120,6 +124,7 @@ def main():
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
     os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
     os.chdir(DATA_GEN)
 
     # heavy imports AFTER the GPU pin
