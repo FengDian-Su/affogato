@@ -60,17 +60,18 @@ def ground_role(molmo_query, scene, xyz_vote, sam2_predictor, cfg, model, proces
     from single_region import single_region_affordance as sra
     from single_region.molmo_batch import molmo_point_batch as mb
 
-    pts = mb.point_batch(scene.view_images, molmo_query, k=k, batch=batch,
-                         model=model, processor=processor)
+    flat = mb.point_batch(scene.view_images, molmo_query, k=k, batch=batch,
+                          model=model, processor=processor)   # [(x,y) | None] per view
+    pts = [[np.array(p, dtype=np.float32)] if p is not None else [] for p in flat]
     heatmaps = sra.run_sam2_single_query(scene.view_images_np, pts, sam2_predictor, cfg)
     scores, counts = sra.project_and_sample_heatmaps(
         xyz_vote, heatmaps, scene.cameras, scene.K_list, scene.depth_maps, cfg.depth_tolerance)
     # per-view points as a [T,2] float array (NaN = no point) for the notebook overlays
     T = len(scene.view_images)
     pts_arr = np.full((T, 2), np.nan, dtype=np.float32)
-    for vi, p in enumerate(pts):
-        if len(p):
-            pts_arr[vi] = p[0]
+    for vi, p in enumerate(flat):
+        if p is not None:
+            pts_arr[vi] = p
     return pts_arr, scores, counts
 
 
