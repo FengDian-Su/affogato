@@ -605,7 +605,9 @@ def point_batch(views, question, k: int = 4, batch: int = 4,
                   for kk, v in inputs.items()}
         try:
             lp = model.build_logit_processor_from_inputs(inputs)
-            with torch.inference_mode():
+            # official model-card pattern: autocast reconciles the processor's fp32
+            # pixel_values with bf16 weights regardless of how the model was loaded
+            with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
                 out = model.generate(
                     **inputs, logits_processor=lp,
                     max_new_tokens=max_new_tokens, do_sample=False,
