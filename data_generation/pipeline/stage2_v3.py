@@ -40,7 +40,8 @@ def parse_args():
     ap.add_argument("--gpu", default="3")
     ap.add_argument("--num_views", type=int, default=40)
     ap.add_argument("--k", type=int, default=4)          # views per prompt (1 = single-image mode)
-    ap.add_argument("--gpu_mem", type=float, default=0.5)  # vLLM gpu_memory_utilization
+    ap.add_argument("--gpu_mem", type=float, default=0.5)  # vLLM gpu_memory_utilization (0.85 on exclusive GPU)
+    ap.add_argument("--max_batched_tokens", type=int, default=None)  # vLLM per-step token/encoder budget
     ap.add_argument("--skip_existing", action="store_true")
     return ap.parse_args()
 
@@ -102,11 +103,13 @@ def main():
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
     os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
     os.chdir(DATA_GEN)
 
     # heavy imports AFTER the GPU pin; vLLM engine BEFORE SAM2 (it profiles GPU memory)
     from single_region.molmo2_vllm import engine as m2v
-    llm, proc = m2v.load_engine(gpu_memory_utilization=args.gpu_mem, max_images=max(args.k, 1))
+    llm, proc = m2v.load_engine(gpu_memory_utilization=args.gpu_mem, max_images=max(args.k, 1),
+                                max_num_batched_tokens=args.max_batched_tokens)
     from single_region import single_region_affordance as sra
     from pipeline.stage2_bimanual_grounding import build_aff_map, resolve_object, load_canvas, load_scene
 

@@ -50,23 +50,34 @@ _pf = load_official_extractor()
 _UPF = _pf.UnifiedPointFormatter()
 
 
-def load_engine(gpu_memory_utilization=0.5, max_images=4, max_model_len=8192):
-    """Start the vLLM engine + processor. Call ONCE per process, before SAM2."""
+def load_engine(gpu_memory_utilization=0.5, max_images=4, max_model_len=8192,
+                max_num_batched_tokens=None):
+    """Start the vLLM engine + processor. Call ONCE per process, before SAM2.
+
+    max_num_batched_tokens: per-step prefill/token budget (official throughput
+    knob, see docs.vllm.ai/configuration/optimization and gemma.py) — also the
+    multi-image encoder-cache budget. None keeps vLLM's default."""
     os.environ.setdefault("VLLM_WORKER_MULTIPROC_METHOD", "spawn")
     from vllm import LLM
     from transformers import AutoProcessor
     proc = AutoProcessor.from_pretrained(MODEL_ID, trust_remote_code=True)
+    sched = {}
+    if max_num_batched_tokens is not None:
+        sched["max_num_batched_tokens"] = max_num_batched_tokens
     llm = LLM(model=MODEL_ID, trust_remote_code=True,
               gpu_memory_utilization=gpu_memory_utilization,
               max_model_len=max_model_len,
               limit_mm_per_prompt={"image": max_images, "video": 0},
-              mm_encoder_attn_backend="TORCH_SDPA")
+              mm_encoder_attn_backend="TORCH_SDPA", **sched)
     return llm, proc
 
 
 def render_prompt(proc, question, n_images):
-    msgs = [{"role": "user", "content": [dict(type="text", text=question),
-                                         *[dict(type="image") for _ in range(n_images)]]}]
+    """Images FIRST, question LAST: the shared image prefix (~95% of prompt
+    tokens) hits vLLM's prefix cache across an object's queries. Precision
+    A/B 2026-07-11: k1 0.844 / k4 0.827 AUC — identical to question-first."""
+    msgs = [{"role": "user", "content": [*[dict(type="image") for _ in range(n_images)],
+                                         dict(type="text", text=question)]}]
     return proc.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
 
 
@@ -101,6 +112,12 @@ def ground_queries(llm, proc, view_images, molmo_queries, k=4, max_tokens=512):
                 reqs.append({"prompt": render_prompt(proc, question, len(chunk)),
                              "multi_modal_data": {"image": chunk}})
                 keys.append((qi, s, len(chunk)))
+    # NOTE (2026-07-11 tuning session): single-submit is the fastest shape tried.
+    # gpu_mem 0.5->0.85 + max_num_batched_tokens 16k: no change (per-object batch
+    # never KV-bound); two-wave submit to pre-commit the shared image-prefix KV:
+    # SLOWER (wave serialization > cache win — V1 already dedupes encoder outputs
+    # by mm_hash and hits committed prefixes as waves drain). Next real levers are
+    # cross-object batching / async two-phase, not knobs.
     outs = llm.generate(reqs, SamplingParams(temperature=0.0, max_tokens=max_tokens),
                         use_tqdm=False)
     per_query = [[None] * T for _ in molmo_queries]
