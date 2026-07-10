@@ -79,7 +79,7 @@ header .meta{color:#9aa3af;font-size:13px}
 .qhead{display:flex;align-items:center;gap:8px;font-weight:650;font-size:14.5px}
 .badge{font-size:10.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
 padding:3px 8px;border-radius:999px;color:#fff;flex:none}
-.badge.inter{background:var(--inter)}.badge.intra{background:var(--intra)}
+.badge.inter{background:var(--inter)}.badge.intra{background:var(--intra)}.badge.pose{background:#d97706}
 .pattern{color:var(--muted);font-size:12.5px;margin:5px 0 9px}
 .pattern b{color:var(--accent);font-weight:700}
 .roles{display:flex;flex-direction:column;gap:6px;margin-bottom:9px}
@@ -110,12 +110,15 @@ def molmo_html(m):
     return f'<div class="molmo">{s}</div>'
 
 
+CAT_LABEL = {"inter": "object-level", "intra": "component-level", "pose": "functional-pose"}
+
+
 def query_html(q):
     cat = q.get("category", "")
     roles = "".join(role_html(r) for r in q.get("roles", []))
     molmos = "".join(molmo_html(m) for m in q.get("molmo_queries", []))
     return (f'<div class="query"><div class="qhead">'
-            f'<span class="badge {esc(cat)}">{esc(cat)}</span>{esc(q.get("query"))}</div>'
+            f'<span class="badge {esc(cat)}">{esc(CAT_LABEL.get(cat, cat))}</span>{esc(q.get("query"))}</div>'
             f'<div class="pattern"><b>{esc(q.get("pattern"))}</b> · {esc(q.get("relation"))}</div>'
             f'<div class="roles">{roles}</div>{molmos}</div>')
 
@@ -160,7 +163,8 @@ def main():
            f"<title>{esc(args.title)}</title><style>{CSS}</style></head><body>"
            f"<header><h1>{esc(args.title)}</h1>"
            f"<div class='meta'>{len(objs)} objects · {n_q} queries · "
-           f"inter = whole-object · intra = part-level · each role: verb → target @ contact_region</div>"
+           f"object-level = whole object · component-level = part-level · functional-pose = use pose · "
+           f"each role: verb → target @ contact_region</div>"
            f"</header><div class='grid'>{cards}</div>"
            f"<footer>generated from {esc(os.path.basename(inp))}</footer></body></html>")
     with open(out, "w") as f:

@@ -4,8 +4,8 @@ stage2_bimanual_grounding.py
 =====================
 
 Batch **bimanual** 3D-affordance grounding, packaged from the step-by-step
-notebook ``notebook/molmo_sam_grounding_mailbox.ipynb`` into structured,
-callable functions + a CLI.
+notebook ``notebook/stage02_walkthrough.ipynb`` (formerly
+``molmo_sam_grounding_mailbox.ipynb``) into structured, callable functions + a CLI.
 
 For one object + one of its stage-1 *bimanual tasks* (a two-role coordinated
 manipulation), this grounds **both hands' contact regions** on the affogato
@@ -148,8 +148,7 @@ def load_canvas(aff_dir):
     # affogato points use a different axis convention than the gObjaverse cameras;
     # align once (swap Y/Z, flip new Y) before projecting/voting -- matches
     # sra.process_object / point_cloud_from_depth.ipynb. gt[i] stays attached to point i.
-    xyz_vote = xyz[:, [0, 2, 1]].copy()
-    xyz_vote[:, 1] *= -1
+    xyz_vote = sra.align_affogato_frame(xyz)
     meta = json.load(open(os.path.join(aff_dir, "queries.json")))[0]
     return Canvas(xyz=xyz, xyz_vote=xyz_vote, gt=gt,
                   gt_queries=list(meta.get("queries", [])),
@@ -170,10 +169,9 @@ def load_scene(obj_root, num_views):
 
 def ground_role(molmo_query, scene: Scene, xyz_vote, models, cfg):
     """Full chain for one 'Point to ...' phrase. Returns (pts_per_view, heatmaps, scores, counts)."""
-    pts = sra.run_molmo_single_query(scene.view_images, molmo_query, models, cfg)
-    heatmaps = sra.run_sam2_single_query(scene.view_images_np, pts, models.sam2_predictor, cfg)
-    scores, counts = sra.project_and_sample_heatmaps(
-        xyz_vote, heatmaps, scene.cameras, scene.K_list, scene.depth_maps, cfg.depth_tolerance)
+    pts, heatmaps, scores, counts = sra.ground_single_query(
+        molmo_query, scene.view_images, scene.view_images_np, xyz_vote,
+        scene.cameras, scene.K_list, scene.depth_maps, models, cfg)
     hit = sum(len(p) > 0 for p in pts)
     print(f"  Molmo hit {hit}/{scene.n_views} | score [{scores.min():.3f}, {scores.max():.3f}] "
           f"mean {scores.mean():.3f} | coverage {(counts > 0).mean() * 100:.0f}%")
@@ -246,13 +244,14 @@ def ground_task(rec, qi, scene: Scene, canvas: Canvas, models, cfg, task_dir):
 
     print(f"\n{'-'*60}\n[{rec['object_id']}] q{qi}: {query['task']}\n  A: {labelA}\n  B: {labelB}\n{'-'*60}")
 
-    print("role A:", mqA)
-    ptsA, hmA, scoreA, countsA = ground_role(mqA, scene, canvas.xyz_vote, models, cfg)
-    save_view_overlays(os.path.join(task_dir, "roleA"), scene, ptsA, hmA)
-
-    print("role B:", mqB)
-    ptsB, hmB, scoreB, _ = ground_role(mqB, scene, canvas.xyz_vote, models, cfg)
-    save_view_overlays(os.path.join(task_dir, "roleB"), scene, ptsB, hmB)
+    grounded = {}
+    for tag, mq in (("roleA", mqA), ("roleB", mqB)):
+        print(f"{tag}:", mq)
+        pts, hm, score, counts = ground_role(mq, scene, canvas.xyz_vote, models, cfg)
+        save_view_overlays(os.path.join(task_dir, tag), scene, pts, hm)
+        grounded[tag] = (score, counts)
+    scoreA, countsA = grounded["roleA"]
+    scoreB, _ = grounded["roleB"]
 
     # split the two (independently grounded) role heatmaps into two distinct regions
     scoreA_p, scoreB_p = sra.partition_two_roles(scoreA, scoreB, roleA, roleB, canvas.xyz)

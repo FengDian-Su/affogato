@@ -39,9 +39,11 @@ Known divergences from the *original* AFFOGATO data-generation engine
   * Mask model: original used **MobileSAM**; here we use **SAM2** (`mask_select`
     picks one of SAM2's multimask outputs).
   * Heatmap: original = raw **sigmoid(mask logits)**, no spatial kernel; this
-    pipeline multiplies by a **Gaussian weight** centred on the Molmo point
-    (`use_gaussian=True`). Set `use_gaussian=False` to get the more
-    paper-faithful raw-sigmoid heatmap.
+    pipeline can additionally multiply by a **Gaussian weight** centred on the
+    Molmo point. The CLI defaults to Gaussian ON (pass `--no_gaussian` for the
+    more paper-faithful raw-sigmoid heatmap); note `PipelineConfig` itself
+    defaults to `use_gaussian=False`, which is what non-CLI callers (stage2's
+    default) get.
   * Point model: original used `allenai/Molmo-7B-D-0924`; the team's pipeline
     uses `allenai/MolmoPoint-8B` (kept as the default here so we validate *our*
     reproduction).
@@ -64,7 +66,6 @@ os.environ.setdefault("OPENCV_IO_ENABLE_OPENEXR", "1")
 os.environ.setdefault("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
 
 import gc
-import glob
 import json
 import argparse
 from dataclasses import dataclass, asdict
@@ -198,6 +199,16 @@ def load_view_images(img_folder_path, num_views):
     return view_images, view_images_np
 
 
+def align_affogato_frame(xyz):
+    """AFFOGATO canvas -> G-Objaverse camera frame: swap Y/Z, then flip the new Y.
+
+    Matches point_cloud_from_depth.ipynb (CELL 17). Row order is preserved, so
+    gt[i] stays attached to point i."""
+    out = xyz[:, [0, 2, 1]].copy()
+    out[:, 1] *= -1
+    return out
+
+
 # ==============================================================================
 # Models
 # ==============================================================================
@@ -220,16 +231,14 @@ def make_gaussian_weight(H, W, points, sigma=50):
 
 
 def load_molmo_model(model_id):
-    """Load MolmoPoint processor + model, and its `extract_image_points` helper."""
+    """Load MolmoPoint processor + model."""
     from transformers import AutoProcessor, AutoModelForImageTextToText
     print(f"\nLoading Molmo model: {model_id} ...")
     molmo_processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
     molmo_model = AutoModelForImageTextToText.from_pretrained(
         model_id, trust_remote_code=True, torch_dtype=torch.bfloat16, device_map="cuda",
     )
-    _mod = __import__(type(molmo_model).__module__, fromlist=["extract_image_points"])
-    extract_image_points = _mod.extract_image_points
-    return molmo_processor, molmo_model, extract_image_points
+    return molmo_processor, molmo_model
 
 
 def load_sam2_model(checkpoint, model_cfg, device):
@@ -244,21 +253,20 @@ def load_sam2_model(checkpoint, model_cfg, device):
 class Models:
     molmo_processor: object
     molmo_model: object
-    extract_image_points: object
     sam2_predictor: object
 
 
 def load_models(cfg: PipelineConfig) -> Models:
-    molmo_processor, molmo_model, extract_image_points = load_molmo_model(cfg.molmo_model_id)
+    molmo_processor, molmo_model = load_molmo_model(cfg.molmo_model_id)
     sam2_predictor = load_sam2_model(cfg.sam2_checkpoint, cfg.sam2_model_cfg, cfg.device)
-    return Models(molmo_processor, molmo_model, extract_image_points, sam2_predictor)
+    return Models(molmo_processor, molmo_model, sam2_predictor)
 
 
 def molmo_query_image(img, query_text, models: Models, max_new_tokens=200):
-    """Single-image MolmoPoint query -> top-1 (x, y) point. (copied from run_pipeline.py)"""
+    """Single-image MolmoPoint query -> first decoded (x, y) point (raster order,
+    not confidence-ranked; see note below). (adapted from run_pipeline.py)"""
     molmo_processor = models.molmo_processor
     molmo_model = models.molmo_model
-    extract_image_points = models.extract_image_points
 
     messages = [{"role": "user", "content": [
         {"type": "image", "image": img},
@@ -275,20 +283,31 @@ def molmo_query_image(img, query_text, models: Models, max_new_tokens=200):
     inputs = {k: v.to(molmo_model.device) for k, v in inputs.items()}
 
     with torch.inference_mode(), torch.amp.autocast("cuda", dtype=torch.bfloat16):
-        generated_ids = molmo_model.generate(**inputs, max_new_tokens=max_new_tokens)
+        generated_ids = molmo_model.generate(
+            **inputs,
+            # OFFICIAL MolmoPoint decoding (model README; stage02_walkthrough SS4b):
+            # constrains generation to VALID point-token sequences
+            # (patch -> subpatch [-> location], raster-sorted, no repeats).
+            logits_processor=molmo_model.build_logit_processor_from_inputs(inputs),
+            max_new_tokens=max_new_tokens,
+        )
 
     generated_tokens = generated_ids[0, inputs["input_ids"].size(1):]
     generated_text = molmo_processor.tokenizer.decode(generated_tokens, skip_special_tokens=False)
 
-    extracted = extract_image_points(
+    # Official model method; it forwards no_more_points_class / patch_location
+    # from the model config itself.
+    extracted = molmo_model.extract_image_points(
         output_text=generated_text,
         pooling=metadata["token_pooling"],
-        mappings=metadata["subpatch_mapping"],
-        no_more_points_class=molmo_model.config.no_more_points_class,
-        location=molmo_model.config.patch_location is not None,
+        subpatch_mapping=metadata["subpatch_mapping"],
         image_sizes=metadata["image_sizes"],
     )
-    # Molmo decode order == confidence order; keep top-1.
+    # Keep the FIRST decoded point. NOTE: decode order is PATCH-RASTER order,
+    # not confidence order — MolmoPoint's config has mask_patches='always', which
+    # (via force_patch_sorted in the official logit processor, and matching its
+    # training) forces ascending patch ids. So [0] = first point in raster order,
+    # NOT "most confident point".
     if len(extracted) > 0:
         _, _, x, y = extracted[0]
         pts = [np.array([x, y])]
@@ -306,7 +325,7 @@ def molmo_query_image(img, query_text, models: Models, max_new_tokens=200):
 # ==============================================================================
 
 def run_molmo_single_query(view_images, query, models: Models, cfg: PipelineConfig):
-    """Molmo top-1 point per view for ONE query. Returns list[ list[np.array([x,y])] ]."""
+    """Molmo first-decoded point per view for ONE query. Returns list[ list[np.array([x,y])] ]."""
     points_per_view = [[] for _ in range(len(view_images))]
     for view_idx in tqdm.trange(len(view_images), desc="MolmoPoint"):
         pts, _ = molmo_query_image(
@@ -405,6 +424,18 @@ def project_and_sample_heatmaps(points, heatmaps, cameras, K_list, depths, depth
     return final_scores, view_counts
 
 
+def ground_single_query(query, view_images, view_images_np, xyz_vote,
+                        cameras, K_list, depth_maps, models: Models, cfg: PipelineConfig):
+    """Molmo -> SAM2 -> multi-view voting for ONE 'Point to ...' query.
+
+    Returns (pts_per_view, heatmaps, scores, counts)."""
+    pts_per_view = run_molmo_single_query(view_images, query, models, cfg)
+    heatmaps = run_sam2_single_query(view_images_np, pts_per_view, models.sam2_predictor, cfg)
+    scores, counts = project_and_sample_heatmaps(
+        xyz_vote, heatmaps, cameras, K_list, depth_maps, cfg.depth_tolerance)
+    return pts_per_view, heatmaps, scores, counts
+
+
 def partition_two_roles(scoreA, scoreB, roleA, roleB, xyz, thr=0.15):
     """Resolve the two grounded role heatmaps into two DISTINCT affordance regions.
 
@@ -479,8 +510,7 @@ def process_object(object_id, pc_path, img_folder_path, queries, models, cfg: Pi
     # gt[i] stays attached to point i; only the coordinates change, so the
     # pred[i] <-> gt[i] correspondence used for the comparison is preserved.
     if cfg.align_gt_frame:
-        xyz_vote = xyz[:, [0, 2, 1]].copy()
-        xyz_vote[:, 1] *= -1
+        xyz_vote = align_affogato_frame(xyz)
     else:
         xyz_vote = xyz
 
@@ -502,10 +532,8 @@ def process_object(object_id, pc_path, img_folder_path, queries, models, cfg: Pi
 
     for qi, q in enumerate(queries):
         print(f"\n--- query {qi+1}/{K}: {q!r} ---")
-        pts_per_view = run_molmo_single_query(view_images, q, models, cfg)
-        heatmaps = run_sam2_single_query(view_images_np, pts_per_view, models.sam2_predictor, cfg)
-        scores, cnts = project_and_sample_heatmaps(
-            xyz_vote, heatmaps, cameras, K_list, depth_maps, cfg.depth_tolerance
+        _, _, scores, cnts = ground_single_query(
+            q, view_images, view_images_np, xyz_vote, cameras, K_list, depth_maps, models, cfg
         )
         pred[:, qi] = scores
         counts = cnts  # visibility is geometry-only -> identical across queries

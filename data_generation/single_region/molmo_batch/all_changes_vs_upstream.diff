@@ -1,0 +1,102 @@
+--- /home/michaellee/.cache/huggingface/hub/models--allenai--MolmoPoint-8B/snapshots/188130f961c8e0888a34e11121a1423c461a01ba/modeling_molmo_point.py	2026-05-23 10:04:23.682966679 +0800
++++ /home/michaellee/.cache/huggingface/modules/transformers_modules/allenai/MolmoPoint_hyphen_8B/188130f961c8e0888a34e11121a1423c461a01ba/modeling_molmo_point.py	2026-07-10 19:50:35.834827138 +0800
+@@ -449,9 +449,15 @@
+             batch_idx = torch.arange(batch_size, device=x_norm.device)
+             image_q = self.patch_q(x_norm)
+             if self.patch_rotary is not None and last_predicted_patch_id is not None:
+-                rotate_by = image_pos_ids[batch_idx, last_predicted_patch_id]
+-                rotate_by = torch.where(last_predicted_patch_id >= 0, rotate_by, 0)
+-                rotate_by = rotate_by.squeeze(-1)
++                # FIX (batch>1): last_predicted_patch_id is [B, 1]; indexing with
++                # ([B]-batch_idx, [B,1]) broadcasts to [B, B]. Flatten to [B] first
++                # (same pattern as `last_predicted_patch_id.view(batch_size)` in
++                # MolmoPointModel.forward). -1 sentinel semantics preserved: index
++                # -1 wraps, then torch.where replaces those rows with 0, exactly as
++                # before. Result is [B], matching the old post-squeeze(-1) shape.
++                last_patch_id_flat = last_predicted_patch_id.view(batch_size)
++                rotate_by = image_pos_ids[batch_idx, last_patch_id_flat]
++                rotate_by = torch.where(last_patch_id_flat >= 0, rotate_by, 0)
+                 image_q = self.patch_rotary(
+                     image_q.view(-1, image_q.shape[-1]),
+                     torch.clamp(rotate_by, min=0),
+@@ -1486,8 +1492,12 @@
+         # Embed the points
+         if can_point:
+             image_token_offset = image_data.flat_image_tokens_to_flat_image_features
+-            should_embed = (input_patch_ids >= 0) and (input_patch_ids < (bounds.patch_end-1))
+-            input_patch_ids_flat = (input_patch_ids + image_token_offset).view(-1)[should_embed.view(-1)]
++            # FIX (batch>1):
++            #   1) `and` was Python bool-AND between two tensors → only worked at B=1
++            #   2) image_token_offset has shape [B]; adding to input_patch_ids [B,T] broadcasts
++            #      to [B,B] (wrong) instead of [B,T]. Need [:, None] for seq-dim broadcast.
++            should_embed = (input_patch_ids >= 0) & (input_patch_ids < (bounds.patch_end - 1))
++            input_patch_ids_flat = (input_patch_ids + image_token_offset[:, None]).view(-1)[should_embed.view(-1)]
+             x.view(-1, dim)[is_patch.view(-1)] += image_data.image_features0.view(-1, dim)[input_patch_ids_flat]
+ 
+             if torch.any(is_subpatch):
+@@ -1495,8 +1505,13 @@
+                 vit_features_flat = vit_features_flat[image_features_mask.view(-1)]
+ 
+                 assert last_predicted_patch_id is not None, "Patch should always be generated before a subpatch"
+-                for_patches = (last_predicted_patch_id.view(batch_size) + image_token_offset)[input_subpatch_ids.view(batch_size) >= 0]
+-                vit_features_to_embed = vit_features_flat[for_patches, input_subpatch_ids]
++                # FIX (batch>1): indexing [K]-shaped `for_patches` with [B,1]-shaped
++                # `input_subpatch_ids` broadcasts to [B,K] / [B,B]. Pair the K selected
++                # rows with their own subpatch ids ([K] with [K]) instead. B=1 (K=1)
++                # values unchanged (old [1,1,D] vs new [1,D] assign identically).
++                sub_sel = input_subpatch_ids.view(batch_size)
++                for_patches = (last_predicted_patch_id.view(batch_size) + image_token_offset)[sub_sel >= 0]
++                vit_features_to_embed = vit_features_flat[for_patches, sub_sel[sub_sel >= 0]]
+                 x.view(-1, dim)[is_subpatch.view(-1)] = self.build_vit_embedding(vit_features_to_embed).to(device=device, dtype=x.dtype)
+ 
+         # shape: (batch_size, seq_len, d_model)
+@@ -1632,6 +1647,21 @@
+     def build_logit_processor_from_inputs(self, inputs) -> LogitsProcessorList:
+         if inputs.get("image_token_pooling") is not None:
+             pooling = inputs["image_token_pooling"]
++            # FIX (batch>1): the processor emits a FLAT pooling [sum_patches_over_batch, C],
++            # but the model's extended token-id space (see build_token_bounds use at
++            # decode time) is laid out with the per-example MAX-PADDED pooling
++            # [B, P_max, C] from build_batched_images. At B=1 sum == P_max so both
++            # agree; at B>1 the flat pooling shifts every bound, so the logit
++            # processor silently masks the wrong score ranges. Rebuild the batched
++            # pooling here (pure indexing, no model weights involved).
++            if inputs.get("input_ids") is not None and inputs.get("pixel_values") is not None:
++                _, pooling = self.model.build_batched_images(
++                    input_ids=inputs["input_ids"],
++                    pixel_values=inputs["pixel_values"],
++                    image_token_pooling=pooling,
++                    image_grids=inputs["image_grids"],
++                    image_num_crops=inputs["image_num_crops"],
++                )
+         elif inputs.get("video_token_pooling") is not None:
+             pooling = inputs["video_token_pooling"]
+         else:
+@@ -1761,6 +1791,14 @@
+         bs, seq, _ = logits.shape
+         if image_data is not None:
+             token_pooling = image_data.token_pooling
++        elif outputs.image_data is not None:
++            # FIX (batch>1): on the prefill step (no image_data kwarg yet) the flat
++            # processor pooling [sum_patches_over_batch, C] gives n_patches summed
++            # over the batch, while every decode step uses the max-padded
++            # image_data.token_pooling [B, P_max, C]. Use the cache built by this
++            # very forward pass so prefill and decode agree on the extended-vocab
++            # layout. At B=1 the shapes coincide, so behavior is unchanged.
++            token_pooling = outputs.image_data.token_pooling
+         else:
+             token_pooling = video_token_pooling if video_token_pooling is not None else image_token_pooling
+         n_patches, n_subpatches = token_pooling.shape[-2:]
+@@ -1784,7 +1822,11 @@
+             bs, seq, n_patches = outputs.patch_logits.shape
+             batch_idx = torch.arange(outputs.patch_logits.shape[0], device=device)
+             seq_ix = torch.arange(outputs.patch_logits.shape[1], device=device)
+-            argmax_patch_logits[batch_idx.view(-1, 1, 1), seq_ix.view(1, -1, 1), selected_patches] = patch_token_logits
++            # FIX (batch>1): `selected_patches` is [B, S]; right-aligned it broadcasts
++            # against ([B,1,1], [1,S,1]) to [B, B, 1] at S=1, writing every sample's
++            # score into every other sample's argmax column. Make it an explicit
++            # per-sample [B, S, 1] scatter. B=1, S=1: identical single write.
++            argmax_patch_logits[batch_idx.view(-1, 1, 1), seq_ix.view(1, -1, 1), selected_patches[:, :, None]] = patch_token_logits[:, :, None]
+ 
+         logits[:, :, self.config.subpatch_token_id] = small_val
+         if outputs.subpatch_logits is not None:
