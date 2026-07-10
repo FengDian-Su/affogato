@@ -49,23 +49,20 @@ def slugify(text, n=40):
     return "".join(c if c.isalnum() else "_" for c in text.lower())[:n].strip("_")
 
 
-def process_object(rec, scene, canvas, pts_per_role, sam2_predictor, cfg, k, out_dir):
-    """SAM2 + voting + partition for every query of one object; pointing already done."""
+def process_object(rec, scene, canvas, pts_per_role, heatmaps_all, proj, cfg, k, out_dir):
+    """Voting + partition + save for every query; pointing AND SAM2 already done
+    object-batched (encoder ran once, projection computed once)."""
     import numpy as np
     from single_region import single_region_affordance as sra
 
     n_done = 0
-    for qi, query, t_point_share in pts_per_role["queries"]:
+    for i, (qi, query, t_share) in enumerate(pts_per_role["queries"]):
         roles, mqs = query["roles"], query["molmo_queries"]
         t0 = time.time()
         role_data = []
         for r in range(2):
             flat = pts_per_role["points"][(qi, r)]
-            pts = [[np.array(p, dtype=np.float32)] if p is not None else [] for p in flat]
-            heatmaps = sra.run_sam2_single_query(scene.view_images_np, pts, sam2_predictor, cfg)
-            scores, counts = sra.project_and_sample_heatmaps(
-                canvas.xyz_vote, heatmaps, scene.cameras, scene.K_list, scene.depth_maps,
-                cfg.depth_tolerance)
+            scores, counts = sra.sample_heatmaps_projected(proj, heatmaps_all[i * 2 + r])
             T = len(scene.view_images)
             pts_arr = np.full((T, 2), np.nan, dtype=np.float32)
             for vi, p in enumerate(flat):
@@ -92,8 +89,8 @@ def process_object(rec, scene, canvas, pts_per_role, sam2_predictor, cfg, k, out
             "n_views": scene.n_views,
             "hitA": int(np.isfinite(ptsA[:, 0]).sum()), "hitB": int(np.isfinite(ptsB[:, 0]).sum()),
             "coverage": float((counts > 0).mean()),
-            "engine": {"name": "molmo2-vllm", "k": k},
-            "seconds": round(time.time() - t0 + t_point_share, 1),
+            "engine": {"name": "molmo2-vllm", "k": k, "sam2": "object-batched"},
+            "seconds": round(time.time() - t0 + t_share, 1),
         }
         json.dump(meta, open(os.path.join(qdir, "meta.json"), "w"), indent=1)
         n_done += 1
@@ -153,16 +150,25 @@ def main():
         mqs_flat = [mq for _, q in queries for mq in q["molmo_queries"]]
         per_query, n_oob = m2v.ground_queries(llm, proc, scene.view_images, mqs_flat, k=args.k)
         t_point = time.time() - t0
+        # SAM2 encoder once per object; projection geometry once per object
+        import numpy as np
+        queries_points = [[[np.array(p, dtype=np.float32)] if p is not None else []
+                           for p in per_query[i]] for i in range(len(mqs_flat))]
+        heatmaps_all = sra.run_sam2_object_queries(scene.view_images_np, queries_points,
+                                                   sam2_predictor, cfg)
+        t_sam = time.time() - t0 - t_point
+        proj = sra.precompute_projection(canvas.xyz_vote, scene.cameras, scene.K_list,
+                                         scene.depth_maps, cfg.depth_tolerance)
         pts_per_role = {
             "points": {(qi, r): per_query[i * 2 + r] for i, (qi, _) in enumerate(queries) for r in range(2)},
-            "queries": [(qi, q, t_point / len(queries)) for qi, q in queries],
+            "queries": [(qi, q, (t_point + t_sam) / len(queries)) for qi, q in queries],
         }
-        n_q = process_object(rec, scene, canvas, pts_per_role, sam2_predictor, cfg,
+        n_q = process_object(rec, scene, canvas, pts_per_role, heatmaps_all, proj, cfg,
                              args.k, args.output_dir)
         n_done += 1
         oob = f" oob={n_oob}" if n_oob else ""
         print(f"[{args.start + oi}] {rec['object_name'][:28]:28} {n_q} queries  "
-              f"{time.time() - t0:.0f}s (point {t_point:.0f}s){oob}", flush=True)
+              f"{time.time() - t0:.0f}s (point {t_point:.0f}s sam2 {t_sam:.0f}s){oob}", flush=True)
     print(f"\nstage2_v3 done: {n_done} objects, {n_skip} skipped -> {args.output_dir}", flush=True)
 
 

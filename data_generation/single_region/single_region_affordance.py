@@ -374,6 +374,96 @@ def run_sam2_single_query(view_images_np, points_per_view, sam2_predictor, cfg: 
     return heatmaps
 
 
+def run_sam2_object_queries(view_images_np, queries_points, sam2_predictor, cfg: PipelineConfig):
+    """SAM2 for ALL queries of one object with the encoder run ONCE.
+
+    Official batch API: set_image_batch embeds every view a single time, then
+    predict_batch (decoder-only, ~ms/view) runs per query. Same mask-selection /
+    gaussian logic as run_sam2_single_query, so per-query outputs match the
+    serial path up to the documented set_image vs set_image_batch embedding
+    difference (~8e-4).
+
+    queries_points: list over queries of points_per_view (list[T] of [K,2] arrays).
+    Returns: list over queries of heatmap lists (list[T] of [H,W] float32).
+    """
+    T = len(view_images_np)
+    H, W = view_images_np[0].shape[:2]
+    zero = np.zeros((H, W), dtype=np.float32)
+    dummy_pt = np.zeros((1, 2), dtype=np.float32)   # empty views get a dummy prompt, output discarded
+    sam2_predictor.set_image_batch(list(view_images_np))
+    out = []
+    for points_per_view in queries_points:
+        coords, labels = [], []
+        for pts in points_per_view:
+            arr = np.array(pts, dtype=np.float32) if len(pts) else dummy_pt
+            coords.append(arr)
+            labels.append(np.ones(len(arr), dtype=np.int32))
+        masks_b, ious_b, _ = sam2_predictor.predict_batch(
+            point_coords_batch=coords, point_labels_batch=labels,
+            multimask_output=True, return_logits=True)
+        hms = []
+        for vi in range(T):
+            points = points_per_view[vi]
+            if len(points) == 0:
+                hms.append(zero)
+                continue
+            masks, iou_scores = masks_b[vi], ious_b[vi]
+            if cfg.mask_select == "smallest":
+                best_idx = int(np.argmin([(m > 0).sum() for m in masks]))
+            else:
+                best_idx = int(np.argmax(iou_scores))
+            heatmap = sigmoid(masks[best_idx]).astype(np.float32)
+            if cfg.use_gaussian:
+                heatmap = heatmap * make_gaussian_weight(H, W, points, sigma=cfg.gaussian_sigma)
+            hms.append(heatmap)
+        out.append(hms)
+    sam2_predictor.reset_predictor()
+    return out
+
+
+def precompute_projection(points, cameras, K_list, depths, depth_tolerance=0.05):
+    """Per-object geometry cache for the voting projection: (u_int, v_int, valid)
+    per view. Same math as project_and_sample_heatmaps, which recomputes it for
+    every role/query even though it only depends on the object."""
+    N = len(points)
+    points_homo = np.hstack([points, np.ones((N, 1))])
+    proj = []
+    for view_idx in range(len(depths)):
+        _, w2c = cameras[view_idx]
+        K = K_list[view_idx]
+        depth_map = depths[view_idx]
+        H, W = depth_map.shape
+        cam_xyz = (w2c @ points_homo.T).T[:, :3]
+        in_front = cam_xyz[:, 2] > 0
+        pixel_homo = (K @ cam_xyz.T).T
+        pixel_uv = pixel_homo[:, :2] / pixel_homo[:, 2:3]
+        u, v = pixel_uv[:, 0], pixel_uv[:, 1]
+        in_bounds = (u >= 0) & (u < W) & (v >= 0) & (v < H)
+        u_int = np.clip(u.astype(np.int32), 0, W - 1)
+        v_int = np.clip(v.astype(np.int32), 0, H - 1)
+        sampled_depth = depth_map[v_int, u_int]
+        visible = (sampled_depth > 0) & (cam_xyz[:, 2] < sampled_depth * (1 + depth_tolerance))
+        proj.append((u_int, v_int, in_front & in_bounds & visible))
+    return proj
+
+
+def sample_heatmaps_projected(proj, heatmaps):
+    """Voting with a precomputed projection (same aggregation as
+    project_and_sample_heatmaps)."""
+    N = len(proj[0][0])
+    score_sum = np.zeros(N, dtype=np.float32)
+    view_counts = np.zeros(N, dtype=np.int32)
+    for (u_int, v_int, valid), heatmap in zip(proj, heatmaps):
+        sampled = np.zeros(N, dtype=np.float32)
+        sampled[valid] = heatmap[v_int[valid], u_int[valid]]
+        score_sum += sampled
+        view_counts += valid.astype(np.int32)
+    final_scores = np.zeros(N, dtype=np.float32)
+    seen = view_counts > 0
+    final_scores[seen] = score_sum[seen] / view_counts[seen]
+    return final_scores, view_counts
+
+
 def project_and_sample_heatmaps(points, heatmaps, cameras, K_list, depths, depth_tolerance=0.05):
     """
     Project the 3D points into every view's 2D heatmap and average over views that
