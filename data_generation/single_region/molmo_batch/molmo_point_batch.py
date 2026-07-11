@@ -3,8 +3,10 @@
 Self-contained module born from the 2026-07-10 batch-bug verification suite
 (step0_exoneration / step2_parity / step3_speed) and the k-chunk x B-batch
 stacking test. No repo-specific loaders: callers pass plain PIL images.
-Used by pipeline/stage2_v2.py and notebook/stage02_walkthrough.ipynb; the
-current production pointing engine is single_region/molmo2_vllm (stage2_v3).
+NOTE: since the MolmoPoint runner was retired (production = Molmo2-8B on vLLM,
+single_region/molmo2_vllm, pipeline/stage2_v2.py) no pipeline code calls this
+module; it is kept as the patch manager + verification record for the six
+upstream MolmoPoint batch bugs (see PATCH_README.md).
 
 Background
 ----------

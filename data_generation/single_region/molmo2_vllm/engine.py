@@ -1,4 +1,4 @@
-"""Molmo2-8B pointing on vLLM — the stage2 v3 pointing engine.
+"""Molmo2-8B pointing on vLLM — the stage2 (pipeline/stage2_v2.py) pointing engine.
 
 Validated 2026-07-11 on the 10-object human-GT benchmark (scratchpad
 vllm_m2_point.py / vllm_m2_score.py): k=1 parity with transformers 0.847-vs-0.844

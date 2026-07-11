@@ -3,10 +3,10 @@
 stage2_bimanual_grounding.py  (stage2 **v1** — superseded as a runner)
 =====================
 
-STATUS: the production runner is ``pipeline/stage2_v3.py`` (Molmo2 on vLLM +
-object-batched SAM2); ``stage2_v2.py`` is the MolmoPoint fallback. This file
-stays alive as the shared LIBRARY for object/scene loading — build_aff_map /
-resolve_object / load_canvas / load_scene are imported by v3 and the notebook.
+STATUS: the production runner is ``pipeline/stage2_v2.py`` (Molmo2-8B on vLLM +
+object-batched SAM2). This file stays alive as the shared LIBRARY for object/
+scene loading — build_aff_map / resolve_object / load_canvas / load_scene are
+imported by stage2_v2 and the notebook.
 
 Batch **bimanual** 3D-affordance grounding, packaged from the step-by-step
 notebook ``notebook/stage02_walkthrough.ipynb`` (formerly
