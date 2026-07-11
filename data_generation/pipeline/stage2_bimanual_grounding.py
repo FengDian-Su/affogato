@@ -1,7 +1,12 @@
 #!/usr/bin/env python
 """
-stage2_bimanual_grounding.py
+stage2_bimanual_grounding.py  (stage2 **v1** — superseded as a runner)
 =====================
+
+STATUS: the production runner is ``pipeline/stage2_v3.py`` (Molmo2 on vLLM +
+object-batched SAM2); ``stage2_v2.py`` is the MolmoPoint fallback. This file
+stays alive as the shared LIBRARY for object/scene loading — build_aff_map /
+resolve_object / load_canvas / load_scene are imported by v3 and the notebook.
 
 Batch **bimanual** 3D-affordance grounding, packaged from the step-by-step
 notebook ``notebook/stage02_walkthrough.ipynb`` (formerly
@@ -113,8 +118,6 @@ class Canvas:
     xyz: np.ndarray          # [N,3] affogato canvas points (original frame, for plotting/partition)
     xyz_vote: np.ndarray     # [N,3] aligned to gObjaverse camera frame (for projecting/voting)
     gt: np.ndarray           # [N,K] affogato GT affordance channels (reference only)
-    gt_queries: list         # affogato's own K queries
-    class_name: str
 
 
 @dataclass
@@ -142,17 +145,14 @@ def resolve_object(rec, aff_map):
 
 
 def load_canvas(aff_dir):
-    """Load xyzc.npy (+ align frame) and affogato's own queries.json."""
+    """Load xyzc.npy (+ align frame) from an affogato canvas dir."""
     xyzc = np.load(os.path.join(aff_dir, "xyzc.npy")).astype(np.float32)
     xyz, gt = xyzc[:, :3], xyzc[:, 3:]
     # affogato points use a different axis convention than the gObjaverse cameras;
     # align once (swap Y/Z, flip new Y) before projecting/voting -- matches
     # sra.process_object / point_cloud_from_depth.ipynb. gt[i] stays attached to point i.
     xyz_vote = sra.align_affogato_frame(xyz)
-    meta = json.load(open(os.path.join(aff_dir, "queries.json")))[0]
-    return Canvas(xyz=xyz, xyz_vote=xyz_vote, gt=gt,
-                  gt_queries=list(meta.get("queries", [])),
-                  class_name=meta.get("class_name", ""))
+    return Canvas(xyz=xyz, xyz_vote=xyz_vote, gt=gt)
 
 
 def load_scene(obj_root, num_views):
@@ -323,7 +323,7 @@ def process_object(rec, obj_root, aff_dir, models, cfg, base_out, query_idx=None
 
 def parse_args():
     p = argparse.ArgumentParser(description="Batch bimanual 3D-affordance grounding")
-    p.add_argument("--stage1", default="outputs/stage1_part0_backup_0630.json",
+    p.add_argument("--stage1", default="outputs/stage1_v2/stage1_part0.json",
                    help="stage-1 dataset json (bimanual tasks + per-role molmo_queries)")
     p.add_argument("--mapping", default="dataset/daily_used_to_affogato.json",
                    help="object_id -> affogato canvas dir mapping (dst)")

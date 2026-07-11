@@ -24,6 +24,8 @@ import json
 import time
 import argparse
 
+import numpy as np
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_GEN = os.path.dirname(HERE)
 sys.path.insert(0, DATA_GEN)
@@ -49,21 +51,25 @@ def slugify(text, n=40):
     return "".join(c if c.isalnum() else "_" for c in text.lower())[:n].strip("_")
 
 
-def process_object(rec, scene, canvas, pts_per_role, heatmaps_all, proj, cfg, k, out_dir):
+def process_object(rec, scene, canvas, queries, per_query, heatmaps_all, proj,
+                   t_share, k, out_dir):
     """Voting + partition + save for every query; pointing AND SAM2 already done
-    object-batched (encoder ran once, projection computed once)."""
-    import numpy as np
+    object-batched (encoder ran once, projection computed once).
+
+    queries: [(qi, query_dict)] eligible queries; per_query / heatmaps_all are
+    indexed i*2+r (query i, role r) — the flat order the pointing ran in.
+    """
     from single_region import single_region_affordance as sra
 
+    T = len(scene.view_images)
     n_done = 0
-    for i, (qi, query, t_share) in enumerate(pts_per_role["queries"]):
+    for i, (qi, query) in enumerate(queries):
         roles, mqs = query["roles"], query["molmo_queries"]
         t0 = time.time()
         role_data = []
         for r in range(2):
-            flat = pts_per_role["points"][(qi, r)]
+            flat = per_query[i * 2 + r]
             scores, counts = sra.sample_heatmaps_projected(proj, heatmaps_all[i * 2 + r])
-            T = len(scene.view_images)
             pts_arr = np.full((T, 2), np.nan, dtype=np.float32)
             for vi, p in enumerate(flat):
                 if p is not None:
@@ -134,14 +140,17 @@ def main():
             continue
         queries = [(qi, q) for qi, q in enumerate(rec.get("queries", []))
                    if len(q.get("roles", [])) == 2 and len(q.get("molmo_queries", [])) == 2]
-        if args.skip_existing:
-            obj_out = os.path.join(args.output_dir, rec["object_id"])
-            if os.path.isdir(obj_out) and len(os.listdir(obj_out)) >= len(queries) > 0:
-                n_skip += 1
-                continue
         if not queries:
             n_skip += 1
             continue
+        if args.skip_existing:
+            obj_out = os.path.join(args.output_dir, rec["object_id"])
+            # complete = every eligible query dir has both output files (a dir
+            # count would permanently skip an object interrupted mid-write)
+            if all(os.path.exists(os.path.join(obj_out, f"q{qi}_{slugify(q['task'])}", fn))
+                   for qi, q in queries for fn in ("scores.npz", "meta.json")):
+                n_skip += 1
+                continue
 
         t0 = time.time()
         canvas = load_canvas(aff_dir)
@@ -151,20 +160,15 @@ def main():
         per_query, n_oob = m2v.ground_queries(llm, proc, scene.view_images, mqs_flat, k=args.k)
         t_point = time.time() - t0
         # SAM2 encoder once per object; projection geometry once per object
-        import numpy as np
         queries_points = [[[np.array(p, dtype=np.float32)] if p is not None else []
-                           for p in per_query[i]] for i in range(len(mqs_flat))]
+                           for p in pq] for pq in per_query]
         heatmaps_all = sra.run_sam2_object_queries(scene.view_images_np, queries_points,
                                                    sam2_predictor, cfg)
         t_sam = time.time() - t0 - t_point
         proj = sra.precompute_projection(canvas.xyz_vote, scene.cameras, scene.K_list,
                                          scene.depth_maps, cfg.depth_tolerance)
-        pts_per_role = {
-            "points": {(qi, r): per_query[i * 2 + r] for i, (qi, _) in enumerate(queries) for r in range(2)},
-            "queries": [(qi, q, (t_point + t_sam) / len(queries)) for qi, q in queries],
-        }
-        n_q = process_object(rec, scene, canvas, pts_per_role, heatmaps_all, proj, cfg,
-                             args.k, args.output_dir)
+        n_q = process_object(rec, scene, canvas, queries, per_query, heatmaps_all, proj,
+                             (t_point + t_sam) / len(queries), args.k, args.output_dir)
         n_done += 1
         oob = f" oob={n_oob}" if n_oob else ""
         print(f"[{args.start + oi}] {rec['object_name'][:28]:28} {n_q} queries  "

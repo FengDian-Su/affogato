@@ -80,10 +80,14 @@ def ground_queries(llm, proc, view_images, molmo_queries, k=4, max_tokens=512):
     """Point every query over all views in ONE llm.generate (continuous batching).
 
     view_images: list[PIL.Image] (equal sizes)
-    molmo_queries: list[str] stage1-style "Point to ..." queries (one per role)
-    Returns: list (per query) of per-view [x, y] | None, plus n_oob index count.
+    molmo_queries: flat list[str] of stage1-style "Point to ..." queries (the
+        caller passes every query x both roles of one object, in order)
+    Returns: list (per query) of per-view [x, y] | None, plus n_oob (points
+    whose 1-based image index fell outside the chunk). A generation that hits
+    max_tokens is truncated mid-coords and parses to ZERO points for that
+    chunk — that silent failure mode is detected via finish_reason and warned
+    about loudly instead.
     """
-    import numpy as np
     from vllm import SamplingParams
     T = len(view_images)
     W, H = view_images[0].size
@@ -104,8 +108,10 @@ def ground_queries(llm, proc, view_images, molmo_queries, k=4, max_tokens=512):
     outs = llm.generate(reqs, SamplingParams(temperature=0.0, max_tokens=max_tokens),
                         use_tqdm=False)
     per_query = [[None] * T for _ in molmo_queries]
-    n_oob = 0
+    n_oob = n_trunc = 0
     for (qi, s, klen), out in zip(keys, outs):
+        if out.outputs[0].finish_reason == "length":
+            n_trunc += 1
         txt = out.outputs[0].text
         if klen == 1:
             pts = _UPF.extract_points(txt, W, H)
@@ -120,4 +126,8 @@ def ground_queries(llm, proc, view_images, molmo_queries, k=4, max_tokens=512):
                         per_query[qi][gi] = [float(x), float(y)]
                 else:
                     n_oob += 1
+    if n_trunc:
+        print(f"WARNING molmo2_vllm: {n_trunc}/{len(reqs)} generations hit "
+              f"max_tokens={max_tokens} and were truncated — their chunks "
+              f"likely lost all points (unparseable coords tail)", flush=True)
     return per_query, n_oob

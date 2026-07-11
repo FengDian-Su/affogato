@@ -2,11 +2,16 @@
 """
 Stage 2 v2 — bimanual grounding with BATCHED Molmo pointing (k-chunk x B-batch).
 
+STATUS: superseded by pipeline/stage2_v3.py (Molmo2-8B on vLLM + object-batched
+SAM2, same output schema, ~2.5x faster end-to-end); kept as the MolmoPoint-8B
+fallback runner (mm env, no vLLM dependency).
+
 What changed vs stage2_bimanual_grounding.py (v1):
-- Molmo pointing goes through single_region/molmo_batch (k=4 views per prompt for
-  cross-view context, B=4 prompts per generate on the batch-patched model)
-  -> ~5x faster than v1's per-view serial loop, and occluded views stop
-  hallucinating because the model sees neighbouring views in the same prompt.
+- Molmo pointing goes through single_region/molmo_batch (k=4 views per prompt
+  for cross-view context, B prompts per generate on the batch-patched model;
+  --batch default 6 = 0.227 s/view next to a ~27-GiB neighbour, --batch 12 on
+  an exclusive GPU) -> ~5x faster than v1's per-view serial loop, and occluded
+  views stop hallucinating because the model sees neighbouring views.
 - The 6-hunk batch patch on the HF modules cache is VERIFIED at startup
   (ensure_batch_patch / assert_model_patched) - never runs silently unpatched.
 - The official pointing logits processor is always on.
@@ -157,9 +162,9 @@ def main():
             n_skip += 1
             continue
         if args.skip_existing:
-            qdirs = [q for qi, q in enumerate(rec.get("queries", []))]
+            n_queries = len(rec.get("queries", []))
             obj_out = os.path.join(args.output_dir, rec["object_id"])
-            if os.path.isdir(obj_out) and len(os.listdir(obj_out)) >= len(qdirs) > 0:
+            if os.path.isdir(obj_out) and len(os.listdir(obj_out)) >= n_queries > 0:
                 n_skip += 1
                 continue
         t0 = time.time()

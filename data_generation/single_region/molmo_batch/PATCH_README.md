@@ -126,10 +126,11 @@ Verified (see docstrings in `molmo_point_batch.py` for the full numbers):
 * k=4 chunks, B=2/B=4 vs B=1: hit-sets identical; 30/32 resp. 29/32 exact.
   The residual 2–3/32 differing views are **rare bf16 tie-flips** — batch
   padding changes reduction order, so near-tied patch argmaxes can flip to an
-  equally valid point. This is expected noise, not corruption; the
-  `parity_check()` gate therefore requires identical hit-sets and bounds the
-  flip fraction (default ≤15%, ~2x the measured rate) instead of demanding
-  100% bitwise equality.
+  equally valid point. This is expected noise, not corruption; the parity
+  criterion used for these measurements was therefore "identical hit-sets +
+  flip fraction ≤15% (~2x the measured rate)" rather than 100% bitwise
+  equality. (The one-off `parity_check()` helper that encoded this gate was
+  removed after the verification campaign; this section is its record.)
 
 **Not fixed — do not use with B>1:**
 
@@ -169,7 +170,7 @@ Other constraints baked into `point_batch()`:
 
 | file                          | role                                                        |
 |-------------------------------|-------------------------------------------------------------|
-| `molmo_point_batch.py`        | the reference module: patch manager (`ensure_batch_patch`, `patch_file`, `assert_model_patched`), `load_official`, `point_batch` (k-chunk x B-batch), `parity_check`; hunk definitions live here (single source of truth) |
+| `molmo_point_batch.py`        | the reference module: patch manager (`ensure_batch_patch`, `patch_file`, `assert_model_patched`), `load_official`, `point_batch` (k-chunk x B-batch); hunk definitions live here (single source of truth) |
 | `apply_patch.py`              | standalone CLI: locate/populate cache, backup to `.orig`, patch, import-verify sentinel |
 | `all_changes_vs_upstream.diff`| the raw 6-hunk diff (documentation copy; the module applies the same change programmatically) |
 | `PATCH_README.md`             | this file                                                   |

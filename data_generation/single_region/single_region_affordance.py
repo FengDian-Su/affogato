@@ -3,6 +3,13 @@
 single_region_affordance.py
 ===========================
 
+NOTE: besides the standalone CLI described below, this file is the SHARED
+LIBRARY for the stage2 pipelines — stage2_v3/v2/v1 and the stage02 notebook
+import its geometry (align_affogato_frame, prepare_camera_params, projection/
+voting), SAM2 helpers (load_sam2_model, run_sam2_single_query,
+run_sam2_object_queries), and partition_two_roles. Treat every public function
+as having external callers.
+
 Formal, standalone **single-region** 3D-affordance heatmap generator, extracted
 from `run_pipeline.py` (the bimanual pipeline) and reduced to exactly the AFFOGATO
 single-region setting:

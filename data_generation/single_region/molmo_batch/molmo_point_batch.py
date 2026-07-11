@@ -1,10 +1,10 @@
 """Batched multi-view pointing with allenai/MolmoPoint-8B.
 
-One self-contained reference module consolidating the 2026-07-10 batch-bug
-verification suite (step0_exoneration / step2_parity / step3_speed) and the
-k-chunk x B-batch stacking test (k4xb_test). Intended to be lifted directly
-into the affogato repo ("backport") — it has no imports from the scratchpad
-scripts and no repo-specific loaders: callers pass plain PIL images.
+Self-contained module born from the 2026-07-10 batch-bug verification suite
+(step0_exoneration / step2_parity / step3_speed) and the k-chunk x B-batch
+stacking test. No repo-specific loaders: callers pass plain PIL images.
+Used by pipeline/stage2_v2.py and notebook/stage02_walkthrough.ipynb; the
+current production pointing engine is single_region/molmo2_vllm (stage2_v3).
 
 Background
 ----------
@@ -66,19 +66,15 @@ Typical use::
     model, processor = mpb.load_official()
     pts = mpb.point_batch(views, "Point to the handle of the mug.",
                           k=4, batch=4)         # -> [(x, y) | None] per view
-    report = mpb.parity_check(views, question, k=4, batch=4,
-                              save_path="parity.json")
 """
 from __future__ import annotations
 
 import glob
 import inspect
-import json
 import os
 import py_compile
 import shutil
 import sys
-import time
 
 MODEL_ID = "allenai/MolmoPoint-8B"
 MODULE_BASENAME = "modeling_molmo_point.py"
@@ -490,8 +486,9 @@ def _chunk_metadata(processor, question, images):
 def _extract_chunk_points(extract_fn, model, text, metadata, base_index):
     """Top-1 point per view for one chunk: {global_view_idx: (x, y)}.
 
-    ``extract_image_points`` yields points in decode (confidence) order, so
-    the FIRST point emitted for an image is its top-1.
+    ``extract_image_points`` yields points in decode order, which under the
+    model's ``mask_patches="always"`` config is PATCH-RASTER order (not
+    confidence); "top-1" here just means the first point kept per image.
     """
     pts = extract_fn(
         output_text=text,
@@ -529,8 +526,7 @@ def _group_chunks(chunks, batch):
 
 def point_batch(views, question, k: int = 4, batch: int = 4,
                 max_new_tokens: int = 512, model_id: str = MODEL_ID,
-                model=None, processor=None, return_details: bool = False,
-                checkpoint_path=None):
+                model=None, processor=None):
     """Point at ``question``'s target in every view; k-chunk x B-batch scheme.
 
     Args:
@@ -545,11 +541,6 @@ def point_batch(views, question, k: int = 4, batch: int = 4,
             points for several views); the k=1 suite used 200.
         model_id / model / processor: pass an existing (model, processor)
             pair or let the module load-and-cache :func:`load_official`.
-        return_details: also return per-chunk texts/timing.
-        checkpoint_path: if set, resolved points are dumped to this JSON
-            after EVERY completed group, so an OOM at a risky batch size can
-            never lose earlier results (the k4xb prototype saved only at the
-            very end and lost its whole sweep to a B=8 OOM; fixed here).
 
     Returns:
         ``points``: list aligned with ``views``; entry = (x, y) in original
@@ -557,7 +548,6 @@ def point_batch(views, question, k: int = 4, batch: int = 4,
         the model emitted no point for that view (legitimate at k>1 when the
         target is not visible in a view; 32/40 hits on the mug benchmark,
         hit-set identical between serial and batched).
-        With ``return_details``: (points, details_dict).
 
     Throughput/VRAM (95-GiB card, measured): k=4xB=4 = 0.264 s/view at
     55.6 GiB peak (works next to a ~30-GiB neighbour); k=4xB=8 OOMs unless
@@ -567,7 +557,7 @@ def point_batch(views, question, k: int = 4, batch: int = 4,
     every view already resolved (a group is never lost retroactively).
     """
     if not views:
-        return ([], {"hits": 0}) if return_details else []
+        return []
     size0 = views[0].size
     assert all(im.size == size0 for im in views), (
         "point_batch requires equal-size views: per-sample metadata "
@@ -586,8 +576,6 @@ def point_batch(views, question, k: int = 4, batch: int = 4,
     groups = _group_chunks(chunks, batch)
 
     points: dict = {}
-    texts_by_chunk: dict = {}
-    t0 = time.perf_counter()
     for gi, group in enumerate(groups):
         convs = [_conversation(question, imgs) for _, imgs in group]
         # apply_chat_template distinguishes one-conversation vs a list of
@@ -631,161 +619,8 @@ def point_batch(views, question, k: int = 4, batch: int = 4,
         for (start, imgs), txt in zip(group, texts):
             md = _chunk_metadata(processor, question, imgs)
             points.update(_extract_chunk_points(extract_fn, model, txt, md, start))
-            texts_by_chunk[start // k] = txt
-        if checkpoint_path:
-            with open(checkpoint_path, "w", encoding="utf-8") as f:
-                json.dump({"question": question, "k": k, "batch": batch,
-                           "groups_done": gi + 1, "groups_total": len(groups),
-                           "points": {str(i): list(p)
-                                      for i, p in sorted(points.items())}},
-                          f, indent=1)
-    dt = time.perf_counter() - t0
 
-    result = [points.get(i) for i in range(len(views))]
-    if not return_details:
-        return result
-    details = {
-        "hits": len(points),
-        "n_views": len(views),
-        "k": k, "batch": batch, "max_new_tokens": max_new_tokens,
-        "seconds": dt, "s_per_view": dt / len(views),
-        "texts_by_chunk": texts_by_chunk,
-    }
-    return result, details
-
-
-# ==========================================================================
-# Parity gate
-# ==========================================================================
-def parity_check(views, question, k: int = 4, batch: int = 4,
-                 max_new_tokens: int = 512, tol: float = 1e-3,
-                 max_flip_fraction: float = 0.15, model_id: str = MODEL_ID,
-                 model=None, processor=None, save_path=None,
-                 verbose: bool = True) -> dict:
-    """Serial (B=1) vs batched (B=``batch``) parity at chunk size ``k``.
-
-    Runs the SAFE config first (serial reference) and — if ``save_path`` is
-    given — persists the report to disk after every phase, so an OOM in the
-    risky batched phase can never lose the baseline (the k4xb prototype lost
-    its whole sweep to a B=8 OOM at the final json.dump; fixed here).
-
-    Pass criterion (matches the measured behaviour of the patch):
-      * batched phase completed, AND
-      * hit-sets identical (the SAME views get points in both runs), AND
-      * fraction of common views whose top-1 moved by more than ``tol``
-        pixels is <= ``max_flip_fraction``.
-    Greedy bf16 batching legitimately tie-flips a few near-tied argmaxes
-    when padding changes reduction order — measured 2/32 (B=2) and 3/32
-    (B=4) flipped views on the mug at k=4, hit-sets identical, everything
-    else bit-exact. The 0.15 default is ~2x that measured rate; 0 flips is
-    the norm at k=1 (8/8 exact at B=8).
-
-    Returns a machine-readable dict:
-      {"config": {...},
-       "serial":  {"ok", "seconds", "s_per_view", "hits", "points"},
-       "batched": {"ok", "seconds", "s_per_view", "hits", "points",
-                   "peak_vram_gib" | "error"},
-       "parity":  {"hit_sets_identical", "n_common", "n_exact",
-                   "n_within_tol", "n_flips", "flip_fraction", "flips"},
-       "pass": bool}
-    """
-    import torch
-
-    if model is None or processor is None:
-        model, processor = load_official(model_id)
-
-    def _sync():
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-
-    def _save(rep):
-        if save_path:
-            with open(save_path, "w", encoding="utf-8") as f:
-                json.dump(rep, f, indent=1)
-
-    def _phase(B):
-        _sync()
-        t0 = time.perf_counter()
-        pts, det = point_batch(
-            views, question, k=k, batch=B, max_new_tokens=max_new_tokens,
-            model=model, processor=processor, return_details=True)
-        _sync()
-        dt = time.perf_counter() - t0
-        return {
-            "ok": True, "seconds": dt, "s_per_view": dt / len(views),
-            "hits": det["hits"],
-            "points": {str(i): list(p) for i, p in enumerate(pts)
-                       if p is not None},
-        }
-
-    report = {
-        "config": {"model_id": model_id, "k": k, "batch": batch,
-                   "n_views": len(views), "max_new_tokens": max_new_tokens,
-                   "tol": tol, "max_flip_fraction": max_flip_fraction},
-        "serial": None, "batched": None, "parity": None, "pass": False,
-    }
-
-    # -- phase 1: safe serial reference; persisted before anything risky ----
-    report["serial"] = _phase(1)
-    _save(report)
-    if verbose:
-        s = report["serial"]
-        print(f"[parity_check] serial  B=1: hits {s['hits']}/{len(views)}  "
-              f"{s['s_per_view']:.3f} s/view")
-
-    # -- phase 2: risky batched config --------------------------------------
-    if torch.cuda.is_available():
-        torch.cuda.reset_peak_memory_stats()
-    try:
-        report["batched"] = _phase(batch)
-        if torch.cuda.is_available():
-            report["batched"]["peak_vram_gib"] = (
-                torch.cuda.max_memory_allocated() / 2**30)
-    except RuntimeError as e:  # includes the OOM wrapper from point_batch
-        report["batched"] = {"ok": False, "error": f"{type(e).__name__}: {e}"}
-        _save(report)
-        if verbose:
-            print(f"[parity_check] batched B={batch} FAILED: {e}")
-        return report
-    _save(report)
-    if verbose:
-        b = report["batched"]
-        print(f"[parity_check] batched B={batch}: hits {b['hits']}/{len(views)}  "
-              f"{b['s_per_view']:.3f} s/view  "
-              f"peak {b.get('peak_vram_gib', float('nan')):.1f} GiB")
-
-    # -- compare -------------------------------------------------------------
-    sp, bp = report["serial"]["points"], report["batched"]["points"]
-    common = sorted(set(sp) & set(bp), key=int)
-    flips, n_exact, n_within = [], 0, 0
-    for v in common:
-        d = max(abs(sp[v][0] - bp[v][0]), abs(sp[v][1] - bp[v][1]))
-        if d == 0.0:
-            n_exact += 1
-        if d <= tol:
-            n_within += 1
-        else:
-            flips.append({"view": int(v), "serial": sp[v], "batched": bp[v],
-                          "dist": d})
-    hit_sets_identical = set(sp) == set(bp)
-    flip_fraction = (len(flips) / len(common)) if common else 0.0
-    report["parity"] = {
-        "hit_sets_identical": hit_sets_identical,
-        "n_common": len(common), "n_exact": n_exact,
-        "n_within_tol": n_within, "n_flips": len(flips),
-        "flip_fraction": flip_fraction, "flips": flips,
-    }
-    report["pass"] = bool(
-        hit_sets_identical and flip_fraction <= max_flip_fraction)
-    _save(report)
-    if verbose:
-        p = report["parity"]
-        print(f"[parity_check] parity: hit_sets_identical={hit_sets_identical} "
-              f"exact {n_exact}/{len(common)} flips {len(flips)} "
-              f"(<= {max_flip_fraction:.0%} allowed) -> "
-              f"{'PASS' if report['pass'] else 'FAIL'}")
-    return report
-
+    return [points.get(i) for i in range(len(views))]
 
 # ==========================================================================
 # Status CLI (read-only; use apply_patch.py to write)
