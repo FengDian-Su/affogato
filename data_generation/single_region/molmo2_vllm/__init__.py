@@ -1,1 +1,1 @@
-"""Molmo2-8B + vLLM pointing engine for stage2 v3 (see engine.py header)."""
+"""Molmo2-8B + vLLM pointing engine for stage2_v2 (see engine.py header)."""

@@ -1,85 +1,46 @@
 #!/usr/bin/env python
 """
-single_region_affordance.py
-===========================
+single_region_affordance.py — shared library for the stage2 grounding pipelines.
 
-NOTE: besides the standalone CLI described below, this file is the SHARED
-LIBRARY for the stage2 pipelines — stage2_v2 (production), v1, and the notebook
-import its geometry (align_affogato_frame, prepare_camera_params, projection/
-voting), SAM2 helpers (load_sam2_model, run_sam2_single_query,
-run_sam2_object_queries), and partition_two_roles. Treat every public function
-as having external callers.
+Consumers: pipeline/stage2_v2.py (the production runner) and
+notebook/stage02_walkthrough.ipynb. Treat every public function as having
+external callers.
 
-Formal, standalone **single-region** 3D-affordance heatmap generator, extracted
-from `run_pipeline.py` (the bimanual pipeline) and reduced to exactly the AFFOGATO
-single-region setting:
+Contents:
+  * PipelineConfig — SAM2 checkpoint, view count, projection tolerance,
+    default mask-candidate selection.
+  * G-Objaverse geometry / IO (verbatim from run_pipeline.py — proven path):
+    intrinsics, camera poses, EXR depth, view loading, affogato->camera frame
+    alignment.
+  * SAM2: load_sam2_model, run_sam2_object_queries (official set_image_batch /
+    predict_batch, encoder once per object; per-query mask_selects + partner
+    negative points — the "mixed+neg" prompt recipe).
+  * Multi-view voting: precompute_projection + sample_heatmaps_projected.
+  * Canvas refinement + two-role partition (validated 07-15 on 195 queries /
+    50 category-diverse objects): knn_indices, cc_prune, refine_scores,
+    partition_two_roles, prune_partitioned.
+  * Stage2 object/scene loading: Canvas / Scene, build_aff_map, resolve_object,
+    load_canvas, load_scene.
 
-        input query  ->  Molmo (point)  ->  SAM2 (mask -> sigmoid heatmap)
-                      ->  multi-view voting  ->  per-point [0,1] heatmap
-
-The predicted heatmap is scored on the **original AFFOGATO ground-truth points**
-(the 16384 points in `xyzc.npy`, cols 0-2), so it can be compared 1:1 against the
-GT heatmaps (`xyzc.npy` cols 3..7) with no resampling / point matching.
-
-Why this file exists
---------------------
-`run_pipeline.py::main()` (the bimanual path) does two things that make a direct
-GT comparison impossible:
-  1. it queries Molmo with *bimanual role* queries (answer[0]/answer[1]), NOT
-     AFFOGATO's own per-object queries;
-  2. it computes `affordance_scores_gt` on the GT points but then **discards** it
-     (only the reconstruction-point HTML plots are saved).
-This file fixes both: it uses each object's own `queries.json` (AFFOGATO's 5
-queries) and **saves** the per-point GT-aligned heatmaps to disk.
-
-Output (per object), written to `<output_dir>/<object_id>/affordance_pred.npz`:
-  - pred    : (N, K) float32  predicted heatmap, one column per query (queries.json order)
-  - counts  : (N,)   int32    multi-view visibility count per point (same for all queries)
-  - xyz     : (N, 3) float32  GT point coordinates (xyzc.npy cols 0-2)
-  - gt       : (N, K) float32 AFFOGATO GT heatmaps (xyzc.npy cols 3..3+K), saved for convenience
-  - queries : (K,)   <U...    the K query strings used
-  - config_json : 0-d str     the PipelineConfig used (for provenance)
-  - meta_json   : 0-d str     per-object notes (n_views, coverage, score ranges)
-
-Known divergences from the *original* AFFOGATO data-generation engine
-(arXiv:2506.12009) — keep these in mind when interpreting the comparison:
-  * Mask model: original used **MobileSAM**; here we use **SAM2** (`mask_select`
-    picks one of SAM2's multimask outputs).
-  * Heatmap: original = raw **sigmoid(mask logits)**, no spatial kernel; this
-    pipeline can additionally multiply by a **Gaussian weight** centred on the
-    Molmo point. The CLI defaults to Gaussian ON (pass `--no_gaussian` for the
-    more paper-faithful raw-sigmoid heatmap); note `PipelineConfig` itself
-    defaults to `use_gaussian=False`, which is what non-CLI callers (stage2's
-    default) get.
-  * Point model: original used `allenai/Molmo-7B-D-0924`; the team's pipeline
-    uses `allenai/MolmoPoint-8B` (kept as the default here so we validate *our*
-    reproduction).
-  * Views: `num_views` of the G-Objaverse renders are used (default 24, matching
-    run_pipeline.py); more views -> higher coverage of the GT points.
-
-Run with the repo's `mm` conda env:
-  python single_region_affordance.py --start 0 --end 5 --gpu 2 \
-         --output_dir output_single_region
-
-Most numerical functions are copied verbatim from run_pipeline.py so this file is
-a faithful extraction of the path that actually ran.
+History: this file began as the standalone single-region AFFOGATO reproduction
+CLI (MolmoPoint + SAM2 serial chain, optional gaussian shaping). That chain and
+the CLI were retired 07-15 (production pointing is Molmo2-8B on vLLM in
+single_region/molmo2_vllm/); see git history for the code and
+notes/affogato_validation_*.md for the findings it produced.
 """
 
 import os
 # Must be set before importing cv2 so OpenEXR depth (*_nd.exr) can be read.
 os.environ.setdefault("OPENCV_IO_ENABLE_OPENEXR", "1")
 # Make CUDA device indices match `nvidia-smi` (PCI order, not fastest-first).
-# Set before any torch.cuda call; --gpu then pins via CUDA_VISIBLE_DEVICES in main().
 os.environ.setdefault("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
 
-import gc
+import re
 import json
-import argparse
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 
 import numpy as np
 import cv2
-import torch
 import tqdm
 from PIL import Image
 
@@ -91,23 +52,17 @@ from PIL import Image
 @dataclass
 class PipelineConfig:
     # --- models ---
-    molmo_model_id: str = "allenai/MolmoPoint-8B"
     sam2_checkpoint: str = "checkpoints/sam2.1_hiera_large.pt"
     sam2_model_cfg: str = "configs/sam2.1/sam2.1_hiera_l.yaml"
 
     # --- views / geometry ---
     num_views: int = 24
     depth_tolerance: float = 0.15      # relative depth tol for visibility test
-    align_gt_frame: bool = True        # apply swapYZ+flipY to AFFOGATO points before voting
-                                       # (matches point_cloud_from_depth.ipynb; required!)
 
-    # --- 2D heatmap shaping ---
-    use_gaussian: bool = False          # multiply sigmoid mask by Gaussian around Molmo point
-    gaussian_sigma: float = 77.0       # px; only used when use_gaussian
-    mask_select: str = "best_iou"      # "best_iou" | "smallest"
-
-    # --- molmo decoding ---
-    molmo_max_new_tokens: int = 200
+    # --- 2D mask candidate selection ---
+    mask_select: str = "best_iou"      # "best_iou" | "smallest" | "middle" | "largest"
+                                       # (default; stage2_v2 overrides per query via
+                                       # run_sam2_object_queries' mask_selects)
 
     # --- runtime ---
     device: str = "cuda:0"
@@ -217,35 +172,11 @@ def align_affogato_frame(xyz):
 
 
 # ==============================================================================
-# Models
+# SAM2
 # ==============================================================================
 
 def sigmoid(x):
     return 1.0 / (1.0 + np.exp(-x))
-
-
-def make_gaussian_weight(H, W, points, sigma=50):
-    """Gaussian weight map centred on the Molmo point(s); union via max."""
-    u = np.arange(W)[np.newaxis, :]
-    v = np.arange(H)[:, np.newaxis]
-    weight = np.zeros((H, W), dtype=np.float32)
-    for pt in points:
-        dx = u - pt[0]
-        dy = v - pt[1]
-        g = np.exp(-(dx ** 2 + dy ** 2) / (2 * sigma ** 2))
-        weight = np.maximum(weight, g)
-    return weight
-
-
-def load_molmo_model(model_id):
-    """Load MolmoPoint processor + model."""
-    from transformers import AutoProcessor, AutoModelForImageTextToText
-    print(f"\nLoading Molmo model: {model_id} ...")
-    molmo_processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
-    molmo_model = AutoModelForImageTextToText.from_pretrained(
-        model_id, trust_remote_code=True, torch_dtype=torch.bfloat16, device_map="cuda",
-    )
-    return molmo_processor, molmo_model
 
 
 def load_sam2_model(checkpoint, model_cfg, device):
@@ -256,141 +187,30 @@ def load_sam2_model(checkpoint, model_cfg, device):
     return SAM2ImagePredictor(sam2_model)
 
 
-@dataclass
-class Models:
-    molmo_processor: object
-    molmo_model: object
-    sam2_predictor: object
+def _select_mask_idx(masks, iou_scores, mask_select):
+    """Pick one of SAM2's 3 candidate masks. Granularities by area:
+    smallest ~ local patch, middle ~ part, largest ~ whole object;
+    best_iou = SAM2's own predicted-quality argmax (often the whole object
+    on smooth texture-less bodies)."""
+    if mask_select in ("smallest", "middle", "largest"):
+        order = np.argsort([(m > 0).sum() for m in masks])
+        return int(order[{"smallest": 0, "middle": 1, "largest": 2}[mask_select]])
+    return int(np.argmax(iou_scores))
 
 
-def load_models(cfg: PipelineConfig) -> Models:
-    molmo_processor, molmo_model = load_molmo_model(cfg.molmo_model_id)
-    sam2_predictor = load_sam2_model(cfg.sam2_checkpoint, cfg.sam2_model_cfg, cfg.device)
-    return Models(molmo_processor, molmo_model, sam2_predictor)
-
-
-def molmo_query_image(img, query_text, models: Models, max_new_tokens=200):
-    """Single-image MolmoPoint query -> first decoded (x, y) point (raster order,
-    not confidence-ranked; see note below). (adapted from run_pipeline.py)"""
-    molmo_processor = models.molmo_processor
-    molmo_model = models.molmo_model
-
-    messages = [{"role": "user", "content": [
-        {"type": "image", "image": img},
-        {"type": "text", "text": query_text},
-    ]}]
-    prompt_text = molmo_processor.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True
-    )
-    inputs = molmo_processor(
-        text=prompt_text, images=[img],
-        return_pointing_metadata=True, return_tensors="pt",
-    )
-    metadata = inputs.pop("metadata")
-    inputs = {k: v.to(molmo_model.device) for k, v in inputs.items()}
-
-    with torch.inference_mode(), torch.amp.autocast("cuda", dtype=torch.bfloat16):
-        generated_ids = molmo_model.generate(
-            **inputs,
-            # OFFICIAL MolmoPoint decoding (model README; stage02_walkthrough SS4b):
-            # constrains generation to VALID point-token sequences
-            # (patch -> subpatch [-> location], raster-sorted, no repeats).
-            logits_processor=molmo_model.build_logit_processor_from_inputs(inputs),
-            max_new_tokens=max_new_tokens,
-        )
-
-    generated_tokens = generated_ids[0, inputs["input_ids"].size(1):]
-    generated_text = molmo_processor.tokenizer.decode(generated_tokens, skip_special_tokens=False)
-
-    # Official model method; it forwards no_more_points_class / patch_location
-    # from the model config itself.
-    extracted = molmo_model.extract_image_points(
-        output_text=generated_text,
-        pooling=metadata["token_pooling"],
-        subpatch_mapping=metadata["subpatch_mapping"],
-        image_sizes=metadata["image_sizes"],
-    )
-    # Keep the FIRST decoded point. NOTE: decode order is PATCH-RASTER order,
-    # not confidence order — MolmoPoint's config has mask_patches='always', which
-    # (via force_patch_sorted in the official logit processor, and matching its
-    # training) forces ascending patch ids. So [0] = first point in raster order,
-    # NOT "most confident point".
-    if len(extracted) > 0:
-        _, _, x, y = extracted[0]
-        pts = [np.array([x, y])]
-    else:
-        pts = []
-
-    del inputs, generated_ids, generated_tokens
-    gc.collect()
-    torch.cuda.empty_cache()
-    return pts, generated_text
-
-
-# ==============================================================================
-# Single-query pipeline stages
-# ==============================================================================
-
-def run_molmo_single_query(view_images, query, models: Models, cfg: PipelineConfig):
-    """Molmo first-decoded point per view for ONE query. Returns list[ list[np.array([x,y])] ]."""
-    points_per_view = [[] for _ in range(len(view_images))]
-    for view_idx in tqdm.trange(len(view_images), desc="MolmoPoint"):
-        pts, _ = molmo_query_image(
-            view_images[view_idx], query, models, cfg.molmo_max_new_tokens
-        )
-        points_per_view[view_idx] = pts
-    n_with = sum(1 for p in points_per_view if len(p) > 0)
-    print(f"  views with a point: {n_with}/{len(view_images)}")
-    return points_per_view
-
-
-def run_sam2_single_query(view_images_np, points_per_view, sam2_predictor, cfg: PipelineConfig):
-    """SAM2 point-prompt -> sigmoid(mask logits) [-> Gaussian] per view. Returns list[[H,W]]."""
-    heatmaps = []
-    for view_idx in tqdm.trange(len(view_images_np), desc="SAM2 heatmaps"):
-        points = points_per_view[view_idx]
-        img_np = view_images_np[view_idx]
-        H, W = img_np.shape[:2]
-
-        if len(points) == 0:
-            heatmaps.append(np.zeros((H, W), dtype=np.float32))
-            continue
-
-        sam2_predictor.set_image(img_np)
-        point_coords = np.array(points, dtype=np.float32)
-        point_labels = np.ones(len(points), dtype=np.int32)
-
-        masks, iou_scores, _ = sam2_predictor.predict(
-            point_coords=point_coords,
-            point_labels=point_labels,
-            multimask_output=True,
-            return_logits=True,
-        )
-
-        if cfg.mask_select == "smallest":
-            best_idx = int(np.argmin([(m > 0).sum() for m in masks]))
-        else:
-            best_idx = int(np.argmax(iou_scores))
-
-        heatmap = sigmoid(masks[best_idx]).astype(np.float32)
-        if cfg.use_gaussian:
-            heatmap = heatmap * make_gaussian_weight(H, W, points, sigma=cfg.gaussian_sigma)
-
-        heatmaps.append(heatmap)
-        sam2_predictor.reset_predictor()
-    return heatmaps
-
-
-def run_sam2_object_queries(view_images_np, queries_points, sam2_predictor, cfg: PipelineConfig):
+def run_sam2_object_queries(view_images_np, queries_points, sam2_predictor, cfg: PipelineConfig,
+                            neg_points=None, mask_selects=None):
     """SAM2 for ALL queries of one object with the encoder run ONCE.
 
     Official batch API: set_image_batch embeds every view a single time, then
-    predict_batch (decoder-only, ~ms/view) runs per query. Same mask-selection /
-    gaussian logic as run_sam2_single_query, so per-query outputs match the
-    serial path up to the documented set_image vs set_image_batch embedding
-    difference (~8e-4).
+    predict_batch (decoder-only, ~ms/view) runs per query.
 
     queries_points: list over queries of points_per_view (list[T] of [K,2] arrays).
+    neg_points:     optional, same nesting: one negative point (or None) per
+                    query per view, passed to SAM with label 0 (the partner
+                    role's point separates e.g. mug body from handle masks).
+    mask_selects:   optional per-query candidate-selection override (else
+                    cfg.mask_select for every query).
     Returns: list over queries of heatmap lists (list[T] of [H,W] float32).
     """
     T = len(view_images_np)
@@ -399,39 +219,40 @@ def run_sam2_object_queries(view_images_np, queries_points, sam2_predictor, cfg:
     dummy_pt = np.zeros((1, 2), dtype=np.float32)   # empty views get a dummy prompt, output discarded
     sam2_predictor.set_image_batch(list(view_images_np))
     out = []
-    for points_per_view in queries_points:
+    for qi, points_per_view in enumerate(queries_points):
         coords, labels = [], []
-        for pts in points_per_view:
+        for vi, pts in enumerate(points_per_view):
             arr = np.array(pts, dtype=np.float32) if len(pts) else dummy_pt
+            lab = np.ones(len(arr), dtype=np.int32)
+            neg = neg_points[qi][vi] if (neg_points is not None and len(pts)) else None
+            if neg is not None:
+                arr = np.concatenate([arr, np.asarray(neg, dtype=np.float32).reshape(1, 2)])
+                lab = np.concatenate([lab, np.zeros(1, dtype=np.int32)])
             coords.append(arr)
-            labels.append(np.ones(len(arr), dtype=np.int32))
+            labels.append(lab)
         masks_b, ious_b, _ = sam2_predictor.predict_batch(
             point_coords_batch=coords, point_labels_batch=labels,
             multimask_output=True, return_logits=True)
+        select = mask_selects[qi] if mask_selects is not None else cfg.mask_select
         hms = []
         for vi in range(T):
-            points = points_per_view[vi]
-            if len(points) == 0:
+            if len(points_per_view[vi]) == 0:
                 hms.append(zero)
                 continue
-            masks, iou_scores = masks_b[vi], ious_b[vi]
-            if cfg.mask_select == "smallest":
-                best_idx = int(np.argmin([(m > 0).sum() for m in masks]))
-            else:
-                best_idx = int(np.argmax(iou_scores))
-            heatmap = sigmoid(masks[best_idx]).astype(np.float32)
-            if cfg.use_gaussian:
-                heatmap = heatmap * make_gaussian_weight(H, W, points, sigma=cfg.gaussian_sigma)
-            hms.append(heatmap)
+            best_idx = _select_mask_idx(masks_b[vi], ious_b[vi], select)
+            hms.append(sigmoid(masks_b[vi][best_idx]).astype(np.float32))
         out.append(hms)
     sam2_predictor.reset_predictor()
     return out
 
 
+# ==============================================================================
+# Multi-view voting
+# ==============================================================================
+
 def precompute_projection(points, cameras, K_list, depths, depth_tolerance=0.05):
     """Per-object geometry cache for the voting projection: (u_int, v_int, valid)
-    per view. Same math as project_and_sample_heatmaps, which recomputes it for
-    every role/query even though it only depends on the object."""
+    per view — depends only on the object, shared by every role/query."""
     N = len(points)
     points_homo = np.hstack([points, np.ones((N, 1))])
     proj = []
@@ -455,8 +276,8 @@ def precompute_projection(points, cameras, K_list, depths, depth_tolerance=0.05)
 
 
 def sample_heatmaps_projected(proj, heatmaps):
-    """Voting with a precomputed projection (same aggregation as
-    project_and_sample_heatmaps)."""
+    """Multi-view voting with a precomputed projection: average each point's
+    heatmap samples over the views that see it."""
     N = len(proj[0][0])
     score_sum = np.zeros(N, dtype=np.float32)
     view_counts = np.zeros(N, dtype=np.int32)
@@ -471,301 +292,268 @@ def sample_heatmaps_projected(proj, heatmaps):
     return final_scores, view_counts
 
 
-def project_and_sample_heatmaps(points, heatmaps, cameras, K_list, depths, depth_tolerance=0.05):
-    """
-    Project the 3D points into every view's 2D heatmap and average over views that
-    see each point (multi-view voting). (copied from run_pipeline.py)
+# ------------------------------------------------------------------------------
+# 3D refinement + two-role partition
+# (recipe validated 07-15 on 195 cached queries over 50 category-diverse
+#  objects; measurement trail in the stage2 memory notes)
+# ------------------------------------------------------------------------------
 
-    Returns:
-        scores: [N] aggregated affordance score in [0,1]
-        counts: [N] number of views that see each point (geometry only)
-    """
-    N = len(points)
-    num_views = len(heatmaps)
-    score_sum = np.zeros(N, dtype=np.float32)
-    view_counts = np.zeros(N, dtype=np.int32)
-    points_homo = np.hstack([points, np.ones((N, 1))])
-
-    for view_idx in range(num_views):
-        _, w2c = cameras[view_idx]
-        K = K_list[view_idx]
-        heatmap = heatmaps[view_idx]
-        depth_map = depths[view_idx]
-        H, W = heatmap.shape
-
-        cam_coords = (w2c @ points_homo.T).T
-        cam_xyz = cam_coords[:, :3]
-        in_front = cam_xyz[:, 2] > 0
-
-        pixel_homo = (K @ cam_xyz.T).T
-        pixel_uv = pixel_homo[:, :2] / pixel_homo[:, 2:3]
-        u, v = pixel_uv[:, 0], pixel_uv[:, 1]
-        in_bounds = (u >= 0) & (u < W) & (v >= 0) & (v < H)
-
-        proj_depth = cam_xyz[:, 2]
-        u_int = np.clip(u.astype(np.int32), 0, W - 1)
-        v_int = np.clip(v.astype(np.int32), 0, H - 1)
-        sampled_depth = depth_map[v_int, u_int]
-        visible = (sampled_depth > 0) & (proj_depth < sampled_depth * (1 + depth_tolerance))
-
-        valid_mask = in_front & in_bounds & visible
-        sampled_scores = np.zeros(N, dtype=np.float32)
-        sampled_scores[valid_mask] = heatmap[v_int[valid_mask], u_int[valid_mask]]
-
-        score_sum += sampled_scores
-        view_counts += valid_mask.astype(np.int32)
-
-    final_scores = np.zeros(N, dtype=np.float32)
-    seen = view_counts > 0
-    final_scores[seen] = score_sum[seen] / view_counts[seen]
-    return final_scores, view_counts
+UP_AXIS = 2                        # gravity axis of the original canvas frame
+HOR_AXES = [0, 1]
+HI_RE = re.compile(r"\b(upper|top|uppermost)\b", re.I)
+LO_RE = re.compile(r"\b(lower|bottom|base|beneath|under|below)\b", re.I)
+OPP_RE = re.compile(r"\b(opposite|other side|each side|both sides|two sides|either side)\b", re.I)
+# partition gate for "body-level" targets; DELIBERATELY wider than the SAM
+# mask-selection rule (stage2_v2.is_body_target: body/wall/surface only) —
+# the two were calibrated separately, do not unify.
+BODY_TARGET_RE = re.compile(r"\b(body|wall|surface|face|corner|side|bag)\b", re.I)
 
 
-def ground_single_query(query, view_images, view_images_np, xyz_vote,
-                        cameras, K_list, depth_maps, models: Models, cfg: PipelineConfig):
-    """Molmo -> SAM2 -> multi-view voting for ONE 'Point to ...' query.
+def _vert_term(role):
+    """+1 / -1 / 0: vertical level a role's contact_region declares."""
+    cr = str(role.get("contact_region", ""))
+    hi, lo = bool(HI_RE.search(cr)), bool(LO_RE.search(cr))
+    return 1 if hi and not lo else (-1 if lo and not hi else 0)
 
-    Returns (pts_per_view, heatmaps, scores, counts)."""
-    pts_per_view = run_molmo_single_query(view_images, query, models, cfg)
-    heatmaps = run_sam2_single_query(view_images_np, pts_per_view, models.sam2_predictor, cfg)
-    scores, counts = project_and_sample_heatmaps(
-        xyz_vote, heatmaps, cameras, K_list, depth_maps, cfg.depth_tolerance)
-    return pts_per_view, heatmaps, scores, counts
+
+def knn_indices(xyz, k=8):
+    """[N, k] nearest-neighbour indices (self excluded); the geometry cache for
+    all canvas-space refinement, computed once per object."""
+    from scipy.spatial import cKDTree
+    return cKDTree(xyz).query(xyz, k=k + 1)[1][:, 1:]
+
+
+def _support_components(s, idxNN, thr):
+    """Connected components of the >thr support over the kNN subgraph.
+    (The canvas has near-duplicate points, so radius-based CC fragments;
+    the kNN subgraph is density-adaptive.) Returns (point_idx, label, mass)."""
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+    pi = np.nonzero(s > thr)[0]
+    inv = -np.ones(len(s), dtype=np.int64)
+    inv[pi] = np.arange(len(pi))
+    dst = inv[idxNN[pi].ravel()]
+    src = np.repeat(np.arange(len(pi)), idxNN.shape[1])
+    ok = dst >= 0
+    g = coo_matrix((np.ones(int(ok.sum())), (src[ok], dst[ok])),
+                   shape=(len(pi), len(pi)))
+    ncc, lab = connected_components(g, directed=False)
+    return pi, lab, np.bincount(lab, weights=s[pi], minlength=ncc)
+
+
+def cc_prune(s, idxNN, thr=0.15, keep_frac=0.10):
+    """Drop satellite components holding < keep_frac of the largest one's mass."""
+    if (s > thr).sum() < 5:
+        return s
+    pi, lab, mass = _support_components(s, idxNN, thr)
+    out = s.copy()
+    out[pi[mass[lab] < keep_frac * mass.max()]] = 0.0
+    return out
+
+
+def refine_scores(s, idxNN, thr=0.15, iters=2, alpha=0.6):
+    """Pre-partition cleanup: satellite prune + kNN smoothing (fills interior
+    holes, decays isolated specks)."""
+    out = cc_prune(s, idxNN, thr).astype(np.float32)
+    for _ in range(iters):
+        out = alpha * out + (1 - alpha) * out[idxNN].mean(1)
+    return out
+
+
+def prune_partitioned(score, s_ref, idxNN, thr=0.15):
+    """Post-partition satellite prune (clears winner-take-all remnants) with an
+    erase guard: cleanup must not delete the signal, so pruning is skipped when
+    it would leave <20% of the role's pre-partition support s_ref."""
+    out = cc_prune(score, idxNN, thr)
+    if (out > thr).sum() < 0.2 * max(1, (s_ref > thr).sum()):
+        return score
+    return out
+
+
+def _score_anchor(s, xyz):
+    """Weighted centroid of the top-5% scores (None if the score is empty)."""
+    m = s >= np.percentile(s, 95)
+    if not m.any() or s[m].sum() <= 0:
+        return None
+    return (xyz[m] * s[m, None]).sum(0) / s[m].sum()
 
 
 def partition_two_roles(scoreA, scoreB, roleA, roleB, xyz, thr=0.15):
-    """Resolve the two grounded role heatmaps into two DISTINCT affordance regions.
+    """Resolve the two grounded role heatmaps into two DISJOINT regions.
 
-    Molmo grounds each role's contact_region independently, with no notion of "the other hand"
-    or "opposite" -- so for a symmetric co-lift (both hands on the same part's opposite faces) the
-    two channels collapse onto one region, and for an asymmetric grasp they can overlap at the part
-    boundary. Fix it with a structure-driven partition (no per-object rules), keyed on whether the
-    two roles target the SAME part:
+    Molmo grounds each role independently, so symmetric co-lifts collapse onto
+    one region and asymmetric grasps overlap at part boundaries. Three layers,
+    all object-agnostic (query text + score geometry only):
 
-      * same target part -> symmetric co-lift: UNION the two regions, then split into two opposite
-        halves along the region's principal axis (the two hands are interchangeable, so A/B labelling
-        of the halves is arbitrary).
-      * different parts   -> make the regions disjoint (an overlapping point goes to whichever role
-        scores it higher).
+    1) text-declared SYMMETRY -- same target, contact_regions carry
+       opposite/other-side wording, no one-sided vertical relation:
+       straight vertical cut through the region center along the canvas axis
+       whose center plane crosses the least material (canvas frames are
+       canonical, so box walls align with axes; angle scans tilt on count
+       noise). Sides assigned by each role's own mass.
+    2) text-declared VERTICAL relation -- horizontal (gravity) cut at the two
+       roles' anchor-height midpoint, the declared-upper role above. Triggers
+       on same-target pairs with a vertical relation, or on any pair where BOTH
+       sides declare opposing terms AND both targets are body-level (votes on
+       body-level targets are saturated and carry no part signal; named parts
+       stay evidence-driven -- hard text planes chop them: measured 0.735 vs
+       0.768 FINAL-AUC when ungated).
+    3) EVIDENCE split -- same-target: vertical plane at the two score anchors'
+       midpoint, each half to the role whose anchor sits on it; diff-target:
+       per-point winner-take-all on the >thr overlap with per-role p99
+       normalization (a small part's peak beats a dominant role's diffuse
+       score, so it keeps its patch). Sub-threshold scores are left in place:
+       exclusivity is required on the support, ranking information survives.
 
-    Args:
-        scoreA, scoreB: [N] voted affordance scores for role A / role B.
-        roleA, roleB:   the two role dicts (only ['target'] is read).
-        xyz:            [N, 3] canvas points, same order as the scores.
-        thr:            score threshold defining each region's support.
-    Returns:
-        (scoreA', scoreB'): the two partitioned score arrays.
+    Returns (scoreA', scoreB').
     """
     same = str(roleA.get("target", "")).strip().lower() == str(roleB.get("target", "")).strip().lower()
-    if same:                                       # symmetric co-lift: union then split by principal axis
+    vA, vB = _vert_term(roleA), _vert_term(roleB)
+    crs = str(roleA.get("contact_region", "")) + " | " + str(roleB.get("contact_region", ""))
+    diag = float(np.linalg.norm(xyz.max(0) - xyz.min(0)))
+
+    # ---- 1) symmetric text: canvas-axis center cut --------------------------
+    if same and OPP_RE.search(crs) and vA == vB:
         region = np.maximum(scoreA, scoreB)
         m = region > thr
-        if m.sum() < 10:                           # too small to split -- leave as-is
+        if m.sum() >= 10:
+            Xh = xyz[m][:, HOR_AXES]
+            w = region[m]
+            mu = (Xh * w[:, None]).sum(0) / w.sum()
+            cross = (np.abs(Xh - mu) < 0.03 * diag).sum(0)   # material near each axis plane
+            d = np.eye(2)[int(cross.argmin())]
+            side = (xyz[:, HOR_AXES] - mu) @ d >= 0
+            a_side = scoreA[side].sum() >= scoreA[~side].sum()
+            return (np.where(side == a_side, region, 0.0),
+                    np.where(side == a_side, 0.0, region))
+
+    # ---- 2) vertical text: horizontal gravity cut ---------------------------
+    bodyish = bool(BODY_TARGET_RE.search(str(roleA.get("target", "")))
+                   and BODY_TARGET_RE.search(str(roleB.get("target", ""))))
+    if (vA * vB == -1 and bodyish) or (same and vA != vB):
+        hiA = vA > vB
+        aA, aB = _score_anchor(scoreA, xyz), _score_anchor(scoreB, xyz)
+        if aA is not None and aB is not None and abs(aA[UP_AXIS] - aB[UP_AXIS]) > 0.02 * diag:
+            z0 = (aA[UP_AXIS] + aB[UP_AXIS]) / 2.0
+            if (aA[UP_AXIS] > aB[UP_AXIS]) != hiA:   # anchors contradict the text -> trust text
+                m = np.maximum(scoreA, scoreB) > thr
+                if m.sum() >= 10:
+                    z0 = float(np.median(xyz[m, UP_AXIS]))
+        else:
+            m = np.maximum(scoreA, scoreB) > thr
+            if m.sum() < 10:
+                return _partition_evidence(scoreA, scoreB, xyz, thr, same, diag)
+            z0 = float(np.median(xyz[m, UP_AXIS]))
+        upper = xyz[:, UP_AXIS] >= z0
+        if same:
+            region = np.maximum(scoreA, scoreB)
+            return (np.where(upper == hiA, region, 0.0),
+                    np.where(upper == hiA, 0.0, region))
+        A, B = scoreA.copy(), scoreB.copy()          # diff-target: only the overlap changes hands
+        both = (scoreA > 0) & (scoreB > 0)
+        A[both & (upper != hiA)] = 0.0
+        B[both & (upper == hiA)] = 0.0
+        return A, B
+
+    # ---- 3) evidence split ---------------------------------------------------
+    return _partition_evidence(scoreA, scoreB, xyz, thr, same, diag)
+
+
+def _partition_evidence(scoreA, scoreB, xyz, thr, same, diag):
+    if same:                     # anchor-directed vertical cut of the union
+        region = np.maximum(scoreA, scoreB)
+        m = region > thr
+        if m.sum() < 10:
             return scoreA, scoreB
-        c = xyz[m].mean(0)
-        axis = np.linalg.svd(xyz[m] - c, full_matrices=False)[2][0]
-        proj = (xyz - c) @ axis
-        split = float(np.median((xyz[m] - c) @ axis))
-        return np.where(proj <= split, region, 0.0), np.where(proj > split, region, 0.0)
-    A, B = scoreA.copy(), scoreB.copy()            # different parts: assign overlap to the higher score
-    both = (A > 0) & (B > 0)
-    A[both & (B >= A)] = 0.0
-    B[both & (A >  B)] = 0.0
+        aA, aB = _score_anchor(scoreA, xyz), _score_anchor(scoreB, xyz)
+        d = None
+        if aA is not None and aB is not None:
+            d = aB - aA
+            d[UP_AXIS] = 0.0
+            if np.linalg.norm(d) < 0.05 * diag:
+                d = None
+        # NB: a role with zero votes anchors to None and lands here -> the
+        # union is still split half/half (same-target roles are interchangeable,
+        # so the halves stay usable; the pre-port code NaN'd on this input).
+        if d is None:            # anchors collapsed -> widest horizontal axis
+            pts = xyz[m][:, HOR_AXES] - xyz[m][:, HOR_AXES].mean(0)
+            ax2 = np.linalg.svd(pts, full_matrices=False)[2][0]
+            d = np.zeros(3)
+            d[HOR_AXES[0]], d[HOR_AXES[1]] = ax2[0], ax2[1]
+            aA = aB = xyz[m].mean(0)
+        d = d / np.linalg.norm(d)
+        mid = (aA + aB) / 2.0
+        # A gets its anchor's side: aA projects <= 0 along d = aB - aA (and the
+        # SVD fallback has aA == mid), so the non-positive half is A's.
+        on_a = (xyz - mid) @ d <= 0
+        return np.where(on_a, region, 0.0), np.where(~on_a, region, 0.0)
+
+    mA, mB = scoreA > thr, scoreB > thr              # diff-target: p99-normalized WTA
+    if not (mA & mB).any():
+        return scoreA, scoreB
+
+    def p99(s):
+        return max(float(np.percentile(s[s > 0], 99)) if (s > 0).any() else 1.0, 1e-6)
+
+    nA = np.clip(scoreA / p99(scoreA), 0, 1)
+    nB = np.clip(scoreB / p99(scoreB), 0, 1)
+    A, B = scoreA.copy(), scoreB.copy()
+    both = mA & mB
+    winA = nA >= nB
+    A[both & ~winA] = 0.0
+    B[both & winA] = 0.0
     return A, B
 
 
 # ==============================================================================
-# Orchestration
+# Stage2 object/scene loading
 # ==============================================================================
 
-def load_object_queries(pc_path):
-    """Read AFFOGATO's own queries for this object from queries.json (same dir as xyzc.npy)."""
-    qpath = os.path.join(os.path.dirname(pc_path), "queries.json")
-    with open(qpath, "r") as f:
-        data = json.load(f)
-    # queries.json = [{"class_name": ..., "queries": [q0, q1, ...]}]
-    entry = data[0]
-    return entry.get("class_name", ""), list(entry["queries"])
+@dataclass
+class Canvas:
+    xyz: np.ndarray          # [N,3] affogato canvas points (original frame, for plotting/partition)
+    xyz_vote: np.ndarray     # [N,3] aligned to gObjaverse camera frame (for projecting/voting)
+    gt: np.ndarray           # [N,K] affogato GT affordance channels (reference only)
 
 
-def process_object(object_id, pc_path, img_folder_path, queries, models, cfg: PipelineConfig):
-    """
-    Run single-region affordance for every query on this object, scored on the
-    AFFOGATO GT points. Returns a result dict (pred/counts/xyz/gt/queries/meta).
-    """
-    # GT point cloud + GT heatmaps (xyzc.npy: cols 0-2 xyz, cols 3.. heatmaps)
-    xyzc = np.load(pc_path).astype(np.float32)
-    xyz = xyzc[:, :3]
-    gt = xyzc[:, 3:]
-    N = xyz.shape[0]
-
-    # AFFOGATO GT points use a different axis convention than the G-Objaverse
-    # camera frame. We MUST align them before projecting/voting, otherwise each
-    # point lands on the wrong pixel and samples the wrong heatmap value.
-    # This matches point_cloud_from_depth.ipynb (CELL 17): swap Y/Z, flip new Y.
-    # (run_pipeline.py omits this -> latent coordinate-frame bug.)
-    # gt[i] stays attached to point i; only the coordinates change, so the
-    # pred[i] <-> gt[i] correspondence used for the comparison is preserved.
-    if cfg.align_gt_frame:
-        xyz_vote = align_affogato_frame(xyz)
-    else:
-        xyz_vote = xyz
-
-    # Clamp num_views to what's actually rendered for this object.
-    avail = count_available_views(img_folder_path)
-    n_views = min(cfg.num_views, avail)
-    if n_views < cfg.num_views:
-        print(f"  [warn] only {avail} views available; using {n_views}")
-    if n_views == 0:
-        raise RuntimeError(f"no usable views in {img_folder_path}")
-
-    cameras, K_list, depth_maps = prepare_camera_params(img_folder_path, n_views)
-    view_images, view_images_np = load_view_images(img_folder_path, n_views)
-
-    K = len(queries)
-    pred = np.zeros((N, K), dtype=np.float32)
-    counts = np.zeros(N, dtype=np.int32)
-    score_ranges = []
-
-    for qi, q in enumerate(queries):
-        print(f"\n--- query {qi+1}/{K}: {q!r} ---")
-        _, _, scores, cnts = ground_single_query(
-            q, view_images, view_images_np, xyz_vote, cameras, K_list, depth_maps, models, cfg
-        )
-        pred[:, qi] = scores
-        counts = cnts  # visibility is geometry-only -> identical across queries
-        score_ranges.append([float(scores.min()), float(scores.max()), float(scores.mean())])
-        print(f"  score [{scores.min():.4f}, {scores.max():.4f}] mean {scores.mean():.4f}")
-
-    coverage = float((counts > 0).mean())
-    print(f"\n  coverage: {coverage*100:.1f}% of {N} GT points seen by >=1 view")
-
-    meta = {
-        "object_id": object_id,
-        "n_views_used": n_views,
-        "n_views_available": avail,
-        "num_points": int(N),
-        "num_queries": int(K),
-        "num_gt_channels": int(gt.shape[1]),
-        "coverage": coverage,
-        "score_ranges_min_max_mean": score_ranges,
-    }
-    return {"pred": pred, "counts": counts, "xyz": xyz, "gt": gt, "queries": queries, "meta": meta}
+@dataclass
+class Scene:
+    n_views: int
+    view_images: list        # list[PIL.Image]
+    view_images_np: list     # list[np.ndarray]
+    cameras: list            # list[(c2w, w2c)]
+    K_list: list
+    depth_maps: list
 
 
-def save_result(out_dir, object_id, result, cfg: PipelineConfig):
-    obj_dir = os.path.join(out_dir, object_id)
-    os.makedirs(obj_dir, exist_ok=True)
-    save_path = os.path.join(obj_dir, "affordance_pred.npz")
-    np.savez_compressed(
-        save_path,
-        pred=result["pred"].astype(np.float32),
-        counts=result["counts"].astype(np.int32),
-        xyz=result["xyz"].astype(np.float32),
-        gt=result["gt"].astype(np.float32),
-        queries=np.array(result["queries"], dtype=object),
-        config_json=json.dumps(asdict(cfg)),
-        meta_json=json.dumps(result["meta"]),
-    )
-    print(f"[INFO] saved {save_path}")
-    return save_path
-
-
-# ==============================================================================
-# CLI
-# ==============================================================================
-
-def setup_device():
-    """CUDA_VISIBLE_DEVICES is already pinned to the chosen GPU, so it is cuda:0 here."""
-    if torch.cuda.is_available():
-        dev = "cuda:0"
-        print(f"Using device: {dev} ({torch.cuda.get_device_name(0)})")
-        return dev
-    print("Using device: cpu")
-    return "cpu"
-
-
-def iter_objects(mapping_path, start, end):
-    """Yield (object_id, pc_path, img_folder_path) from the gobjaverse->affogato mapping."""
+def build_aff_map(mapping_path):
+    """object_id -> affogato canvas dir (dst), from daily_used_to_affogato.json."""
     with open(mapping_path, "r") as f:
         mapping = json.load(f)
-    end = min(end, len(mapping))
-    for i in range(start, end):
-        entry = mapping[i]
-        pc_path = f'{entry["dst"]}/xyzc.npy'
-        img_folder_path = entry["src"]
-        object_id = os.path.basename(entry["dst"])
-        yield object_id, pc_path, img_folder_path
+    return {e["object_id"]: e["dst"] for e in mapping}
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Single-region AFFOGATO affordance reproduction")
-    parser.add_argument("--mapping", default="dataset/gobjaverse_to_affogato_nj.json",
-                        help="gobjaverse->affogato mapping json (src renders, dst xyzc.npy)")
-    parser.add_argument("--start", type=int, default=0)
-    parser.add_argument("--end", type=int, default=5)
-    parser.add_argument("--gpu", type=int, default=2)
-    parser.add_argument("--output_dir", default="outputs/output_single_region")
-    parser.add_argument("--num_views", type=int, default=24)
-    parser.add_argument("--no_gaussian", action="store_true",
-                        help="disable Gaussian weighting (raw sigmoid = closer to original AFFOGATO)")
-    parser.add_argument("--gaussian_sigma", type=float, default=77.0)
-    parser.add_argument("--mask_select", default="best_iou", choices=["best_iou", "smallest"])
-    parser.add_argument("--molmo_model_id", default="allenai/MolmoPoint-8B")
-    parser.add_argument("--sam2_checkpoint", default="checkpoints/sam2.1_hiera_large.pt")
-    parser.add_argument("--sam2_model_cfg", default="configs/sam2.1/sam2.1_hiera_l.yaml")
-    parser.add_argument("--skip_existing", action="store_true")
-    parser.add_argument("--max_objects", type=int, default=None,
-                        help="stop after this many SUCCESSFUL objects (skips missing-render "
-                             "entries silently); when set, --end is ignored (scans to end of mapping)")
-    args = parser.parse_args()
-
-    # Pin the chosen physical GPU (PCI order set at import) BEFORE any CUDA init,
-    # so the only visible device is cuda:0 and Molmo's device_map="cuda" lands there.
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
-    device = setup_device()
-    cfg = PipelineConfig(
-        molmo_model_id=args.molmo_model_id,
-        sam2_checkpoint=args.sam2_checkpoint,
-        sam2_model_cfg=args.sam2_model_cfg,
-        num_views=args.num_views,
-        use_gaussian=not args.no_gaussian,
-        gaussian_sigma=args.gaussian_sigma,
-        mask_select=args.mask_select,
-        device=device,
-    )
-    print("Config:", json.dumps(asdict(cfg), indent=2))
-
-    models = load_models(cfg)
-
-    n_done = n_skip = n_fail = 0
-    scan_end = args.end if args.max_objects is None else 10**9
-    for object_id, pc_path, img_folder_path in iter_objects(args.mapping, args.start, scan_end):
-        out_npz = os.path.join(args.output_dir, object_id, "affordance_pred.npz")
-        if args.skip_existing and os.path.exists(out_npz):
-            n_skip += 1; continue
-
-        # silently skip entries whose renders/GT aren't downloaded locally (scattered)
-        if not (os.path.exists(pc_path) and os.path.isdir(img_folder_path)):
-            n_skip += 1; continue
-
-        print(f"\n{'='*60}\nObject {object_id}  (done so far: {n_done})\n  pc:  {pc_path}\n  img: {img_folder_path}\n{'='*60}")
-        try:
-            class_name, queries = load_object_queries(pc_path)
-            print(f"  class: {class_name} | {len(queries)} queries")
-            result = process_object(object_id, pc_path, img_folder_path, queries, models, cfg)
-            save_result(args.output_dir, object_id, result, cfg)
-            n_done += 1
-        except Exception as e:
-            import traceback; traceback.print_exc()
-            print(f"  [fail] {e}"); n_fail += 1
-
-        if args.max_objects is not None and n_done >= args.max_objects:
-            print(f"\n[INFO] reached --max_objects={args.max_objects}, stopping.")
-            break
-
-    print(f"\n===== DONE =====\n  done: {n_done}  skip: {n_skip}  fail: {n_fail}")
+def resolve_object(rec, aff_map):
+    """(gObjaverse render dir, affogato canvas dir) for one stage-1 record."""
+    obj_root = "/".join(rec["views_used"][0].split("/")[:-2])   # drop /<view>/<view>.png
+    aff_dir = aff_map.get(rec["object_id"])
+    return obj_root, aff_dir
 
 
-if __name__ == "__main__":
-    main()
+def load_canvas(aff_dir):
+    """Load xyzc.npy (+ align frame) from an affogato canvas dir."""
+    xyzc = np.load(os.path.join(aff_dir, "xyzc.npy")).astype(np.float32)
+    xyz, gt = xyzc[:, :3], xyzc[:, 3:]
+    # affogato points use a different axis convention than the gObjaverse cameras;
+    # align once (swap Y/Z, flip new Y) before projecting/voting -- matches
+    # point_cloud_from_depth.ipynb. gt[i] stays attached to point i.
+    xyz_vote = align_affogato_frame(xyz)
+    return Canvas(xyz=xyz, xyz_vote=xyz_vote, gt=gt)
+
+
+def load_scene(obj_root, num_views):
+    """Camera params + RGB views for the (already clamped) view count."""
+    cameras, K_list, depth_maps = prepare_camera_params(obj_root, num_views)
+    view_images, view_images_np = load_view_images(obj_root, num_views)
+    return Scene(n_views=num_views, view_images=view_images, view_images_np=view_images_np,
+                 cameras=cameras, K_list=K_list, depth_maps=depth_maps)

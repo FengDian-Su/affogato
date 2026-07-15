@@ -17,6 +17,13 @@ and the retired MolmoPoint runner:
   with the voting projection geometry cached per object.
 - Lean outputs: per query only scores.npz + meta.json (with per-view points);
   the stage02 notebook browser renders overlays from them on demand.
+- 07-15 recipe (validated on 195 queries / 50 diverse objects): "mixed+neg"
+  SAM prompts (body targets -> smallest candidate, named parts -> best_iou,
+  partner point as negative beyond 30px), canvas refinement (satellite prune +
+  kNN smoothing), partition v6 (text symmetry -> canvas-axis center cut, text
+  vertical -> gravity cut, else evidence split with full overlap resolution),
+  guarded post-prune. scoreA/scoreB are the final disjoint heatmaps;
+  scoreA_raw/scoreB_raw stay the raw voted scores.
 
 Run with the **molmo** conda env (vllm 0.16 + torch cu128 + SAM2 installed):
   ~/miniconda3/envs/molmo/bin/python pipeline/stage2_v2.py --start 0 --end 100 --gpu 3
@@ -54,8 +61,41 @@ def slugify(text, n=40):
     return "".join(c if c.isalnum() else "_" for c in text.lower())[:n].strip("_")
 
 
+NEG_MIN_PX = 30      # partner point becomes a SAM negative only beyond this distance
+
+
+def is_body_target(role):
+    # SAM mask-selection rule; narrower than sra.BODY_TARGET_RE (the partition
+    # gate) — calibrated separately, do not unify.
+    tgt = str(role.get("target", "")).lower()
+    return "body" in tgt or "wall" in tgt or "surface" in tgt
+
+
+def build_sam_prompts(queries, per_query):
+    """Per flat (query x role) job: candidate selection + partner-negative points.
+
+    The validated mask recipe ("mixed+neg"): body-level targets take the
+    smallest SAM candidate (best_iou bleeds to the whole object on smooth
+    bodies), named parts take best_iou; the partner role's point in the same
+    view is added as a negative prompt when the two points are >NEG_MIN_PX
+    apart (separates e.g. mug handle from body masks).
+    """
+    mask_selects, neg_points = [], []
+    for i, (_, q) in enumerate(queries):
+        for r in range(2):
+            mask_selects.append("smallest" if is_body_target(q["roles"][r]) else "best_iou")
+            own, partner = per_query[i * 2 + r], per_query[i * 2 + (1 - r)]
+            negs = []
+            for p, np_ in zip(own, partner):
+                use = (p is not None and np_ is not None
+                       and float(np.linalg.norm(np.asarray(p) - np.asarray(np_))) > NEG_MIN_PX)
+                negs.append(np.asarray(np_, dtype=np.float32) if use else None)
+            neg_points.append(negs)
+    return mask_selects, neg_points
+
+
 def process_object(rec, scene, canvas, queries, per_query, heatmaps_all, proj,
-                   t_share, k, out_dir):
+                   idxNN, t_share, k, out_dir):
     """Voting + partition + save for every query; pointing AND SAM2 already done
     object-batched (encoder ran once, projection computed once).
 
@@ -79,8 +119,13 @@ def process_object(rec, scene, canvas, queries, per_query, heatmaps_all, proj,
                     pts_arr[vi] = p
             role_data.append((pts_arr, scores, counts))
         (ptsA, scoreA_raw, counts), (ptsB, scoreB_raw, _) = role_data
-        scoreA, scoreB = sra.partition_two_roles(scoreA_raw, scoreB_raw,
-                                                 roles[0], roles[1], canvas.xyz)
+        # validated chain: refine (satellite prune + kNN smooth) -> partition
+        # (text symmetry / text vertical / evidence) -> post prune (guarded)
+        refA = sra.refine_scores(scoreA_raw, idxNN)
+        refB = sra.refine_scores(scoreB_raw, idxNN)
+        fA, fB = sra.partition_two_roles(refA, refB, roles[0], roles[1], canvas.xyz)
+        scoreA = sra.prune_partitioned(fA, refA, idxNN)
+        scoreB = sra.prune_partitioned(fB, refB, idxNN)
 
         qdir = os.path.join(out_dir, rec["object_id"], f"q{qi}_{slugify(query['task'])}")
         os.makedirs(qdir, exist_ok=True)
@@ -98,7 +143,8 @@ def process_object(rec, scene, canvas, queries, per_query, heatmaps_all, proj,
             "n_views": scene.n_views,
             "hitA": int(np.isfinite(ptsA[:, 0]).sum()), "hitB": int(np.isfinite(ptsB[:, 0]).sum()),
             "coverage": float((counts > 0).mean()),
-            "engine": {"name": "molmo2-vllm", "k": k, "sam2": "object-batched"},
+            "engine": {"name": "molmo2-vllm", "k": k, "sam2": "object-batched",
+                       "recipe": "mixed+neg / refine / partition-v6 / post-prune"},
             "seconds": round(time.time() - t0 + t_share, 1),
         }
         json.dump(meta, open(os.path.join(qdir, "meta.json"), "w"), indent=1)
@@ -117,7 +163,8 @@ def main():
     from single_region.molmo2_vllm import engine as m2v
     llm, proc = m2v.load_engine(gpu_memory_utilization=args.gpu_mem, max_images=max(args.k, 1))
     from single_region import single_region_affordance as sra
-    from pipeline.stage2_bimanual_grounding import build_aff_map, resolve_object, load_canvas, load_scene
+    from single_region.single_region_affordance import (build_aff_map, resolve_object,
+                                                        load_canvas, load_scene)
 
     cfg = sra.PipelineConfig(num_views=args.num_views)
     sam2_predictor = sra.load_sam2_model(cfg.sam2_checkpoint, cfg.sam2_model_cfg, cfg.device)
@@ -165,13 +212,17 @@ def main():
         # SAM2 encoder once per object; projection geometry once per object
         queries_points = [[[np.array(p, dtype=np.float32)] if p is not None else []
                            for p in pq] for pq in per_query]
+        mask_selects, neg_points = build_sam_prompts(queries, per_query)
         heatmaps_all = sra.run_sam2_object_queries(scene.view_images_np, queries_points,
-                                                   sam2_predictor, cfg)
+                                                   sam2_predictor, cfg,
+                                                   neg_points=neg_points,
+                                                   mask_selects=mask_selects)
         t_sam = time.time() - t0 - t_point
         proj = sra.precompute_projection(canvas.xyz_vote, scene.cameras, scene.K_list,
                                          scene.depth_maps, cfg.depth_tolerance)
+        idxNN = sra.knn_indices(canvas.xyz)
         n_q = process_object(rec, scene, canvas, queries, per_query, heatmaps_all, proj,
-                             (t_point + t_sam) / len(queries), args.k, args.output_dir)
+                             idxNN, (t_point + t_sam) / len(queries), args.k, args.output_dir)
         n_done += 1
         oob = f" oob={n_oob}" if n_oob else ""
         print(f"[{args.start + oi}] {rec['object_name'][:28]:28} {n_q} queries  "
