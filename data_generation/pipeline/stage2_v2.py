@@ -53,6 +53,9 @@ def parse_args():
     ap.add_argument("--num_views", type=int, default=40)
     ap.add_argument("--k", type=int, default=4)          # views per prompt (1 = single-image mode)
     ap.add_argument("--gpu_mem", type=float, default=0.5)  # vLLM gpu_memory_utilization
+    ap.add_argument("--sam_chunk", type=int, default=40)   # views per SAM2 encoder pass;
+                                                           # 40x1024^2 batch encode peaks >20GB,
+                                                           # set 20 on <=48GB cards
     ap.add_argument("--skip_existing", action="store_true")
     return ap.parse_args()
 
@@ -213,10 +216,16 @@ def main():
         queries_points = [[[np.array(p, dtype=np.float32)] if p is not None else []
                            for p in pq] for pq in per_query]
         mask_selects, neg_points = build_sam_prompts(queries, per_query)
-        heatmaps_all = sra.run_sam2_object_queries(scene.view_images_np, queries_points,
-                                                   sam2_predictor, cfg,
-                                                   neg_points=neg_points,
-                                                   mask_selects=mask_selects)
+        # per-image outputs are independent, so encoding the views in chunks is
+        # equivalent; it only caps the encoder's peak memory
+        heatmaps_all = None
+        for v0 in range(0, n_views, args.sam_chunk):
+            hm = sra.run_sam2_object_queries(scene.view_images_np[v0:v0 + args.sam_chunk],
+                                             [q[v0:v0 + args.sam_chunk] for q in queries_points],
+                                             sam2_predictor, cfg,
+                                             neg_points=[n[v0:v0 + args.sam_chunk] for n in neg_points],
+                                             mask_selects=mask_selects)
+            heatmaps_all = hm if heatmaps_all is None else [a + b for a, b in zip(heatmaps_all, hm)]
         t_sam = time.time() - t0 - t_point
         proj = sra.precompute_projection(canvas.xyz_vote, scene.cameras, scene.K_list,
                                          scene.depth_maps, cfg.depth_tolerance)
