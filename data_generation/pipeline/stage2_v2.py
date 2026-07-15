@@ -206,32 +206,44 @@ def main():
                 continue
 
         t0 = time.time()
-        canvas = load_canvas(aff_dir)
-        scene = load_scene(obj_root, n_views)
-        # ONE generate for every query x both roles of this object
-        mqs_flat = [mq for _, q in queries for mq in q["molmo_queries"]]
-        per_query, n_oob = m2v.ground_queries(llm, proc, scene.view_images, mqs_flat, k=args.k)
-        t_point = time.time() - t0
-        # SAM2 encoder once per object; projection geometry once per object
-        queries_points = [[[np.array(p, dtype=np.float32)] if p is not None else []
-                           for p in pq] for pq in per_query]
-        mask_selects, neg_points = build_sam_prompts(queries, per_query)
-        # per-image outputs are independent, so encoding the views in chunks is
-        # equivalent; it only caps the encoder's peak memory
-        heatmaps_all = None
-        for v0 in range(0, n_views, args.sam_chunk):
-            hm = sra.run_sam2_object_queries(scene.view_images_np[v0:v0 + args.sam_chunk],
-                                             [q[v0:v0 + args.sam_chunk] for q in queries_points],
-                                             sam2_predictor, cfg,
-                                             neg_points=[n[v0:v0 + args.sam_chunk] for n in neg_points],
-                                             mask_selects=mask_selects)
-            heatmaps_all = hm if heatmaps_all is None else [a + b for a, b in zip(heatmaps_all, hm)]
-        t_sam = time.time() - t0 - t_point
-        proj = sra.precompute_projection(canvas.xyz_vote, scene.cameras, scene.K_list,
-                                         scene.depth_maps, cfg.depth_tolerance)
-        idxNN = sra.knn_indices(canvas.xyz)
-        n_q = process_object(rec, scene, canvas, queries, per_query, heatmaps_all, proj,
-                             idxNN, (t_point + t_sam) / len(queries), args.k, args.output_dir)
+        try:
+            canvas = load_canvas(aff_dir)
+            scene = load_scene(obj_root, n_views)
+            # ONE generate for every query x both roles of this object
+            mqs_flat = [mq for _, q in queries for mq in q["molmo_queries"]]
+            per_query, n_oob = m2v.ground_queries(llm, proc, scene.view_images, mqs_flat, k=args.k)
+            t_point = time.time() - t0
+            # SAM2 encoder once per object; projection geometry once per object
+            queries_points = [[[np.array(p, dtype=np.float32)] if p is not None else []
+                               for p in pq] for pq in per_query]
+            mask_selects, neg_points = build_sam_prompts(queries, per_query)
+            # per-image outputs are independent, so encoding the views in chunks is
+            # equivalent; it only caps the encoder's peak memory
+            heatmaps_all = None
+            for v0 in range(0, n_views, args.sam_chunk):
+                hm = sra.run_sam2_object_queries(scene.view_images_np[v0:v0 + args.sam_chunk],
+                                                 [q[v0:v0 + args.sam_chunk] for q in queries_points],
+                                                 sam2_predictor, cfg,
+                                                 neg_points=[n[v0:v0 + args.sam_chunk] for n in neg_points],
+                                                 mask_selects=mask_selects)
+                heatmaps_all = hm if heatmaps_all is None else [a + b for a, b in zip(heatmaps_all, hm)]
+            t_sam = time.time() - t0 - t_point
+            proj = sra.precompute_projection(canvas.xyz_vote, scene.cameras, scene.K_list,
+                                             scene.depth_maps, cfg.depth_tolerance)
+            idxNN = sra.knn_indices(canvas.xyz)
+            n_q = process_object(rec, scene, canvas, queries, per_query, heatmaps_all, proj,
+                                 idxNN, (t_point + t_sam) / len(queries), args.k, args.output_dir)
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            # a corrupt render (truncated PNG etc.) must not kill a 5000-object
+            # run; engine deaths still propagate so the outer wrapper restarts
+            if "EngineDead" in type(e).__name__:
+                raise
+            print(f"[{args.start + oi}] {rec['object_name'][:28]:28} FAILED "
+                  f"({type(e).__name__}: {str(e)[:80]}) — object skipped", flush=True)
+            n_skip += 1
+            continue
         n_done += 1
         oob = f" oob={n_oob}" if n_oob else ""
         print(f"[{args.start + oi}] {rec['object_name'][:28]:28} {n_q} queries  "
