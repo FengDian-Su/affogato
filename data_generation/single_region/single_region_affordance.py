@@ -298,8 +298,13 @@ def sample_heatmaps_projected(proj, heatmaps):
 #  objects; measurement trail in the stage2 memory notes)
 # ------------------------------------------------------------------------------
 
-UP_AXIS = 2                        # gravity axis of the original canvas frame
-HOR_AXES = [0, 1]
+UP_AXIS = 1                        # gravity axis of the original canvas frame.
+                                   # MEASURED 07-16: over the 43 cached pairs where both roles
+                                   # declare opposing vertical terms, the declared-upper role's
+                                   # score anchor is higher along axis 1 in 43/43 (axis 2: 47% =
+                                   # chance). Also equals the camera-rig image-up mapped through
+                                   # align_affogato_frame (vote-z == original y).
+HOR_AXES = [0, 2]
 HI_RE = re.compile(r"\b(upper|top|uppermost)\b", re.I)
 LO_RE = re.compile(r"\b(lower|bottom|base|beneath|under|below)\b", re.I)
 OPP_RE = re.compile(r"\b(opposite|other side|each side|both sides|two sides|either side)\b", re.I)
