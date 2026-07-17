@@ -17,8 +17,8 @@ and the retired MolmoPoint runner:
   with the voting projection geometry cached per object.
 - Lean outputs: per query only scores.npz + meta.json (with per-view points);
   the stage02 notebook browser renders overlays from them on demand.
-- 07-15 recipe (validated on 195 queries / 50 diverse objects): "mixed+neg"
-  SAM prompts (body targets -> smallest candidate, named parts -> best_iou,
+- 07-17 recipe (validated on 195 queries / 50 diverse objects): "mixed+neg"
+  SAM prompts (body targets -> middle candidate, named parts -> best_iou,
   partner point as negative beyond 30px), canvas refinement (satellite prune +
   kNN smoothing), partition v6 (text symmetry -> canvas-axis center cut, text
   vertical -> gravity cut, else evidence split with full overlap resolution),
@@ -77,16 +77,19 @@ def is_body_target(role):
 def build_sam_prompts(queries, per_query):
     """Per flat (query x role) job: candidate selection + partner-negative points.
 
-    The validated mask recipe ("mixed+neg"): body-level targets take the
-    smallest SAM candidate (best_iou bleeds to the whole object on smooth
-    bodies), named parts take best_iou; the partner role's point in the same
-    view is added as a negative prompt when the two points are >NEG_MIN_PX
-    apart (separates e.g. mug handle from body masks).
+    The mask recipe ("mixed+neg"): body-level targets take the MIDDLE SAM
+    candidate (part level: "the wall"); named parts take best_iou. The
+    partner role's point in the same view is added as a negative prompt when
+    the two points are >NEG_MIN_PX apart (separates e.g. mug handle from body
+    masks). smallest was retired 07-17: it collapses onto paint/decal patches
+    and face slivers (body-role 3D coverage med 0.539 vs 0.994 for middle on
+    the 195-query GT set, FINAL-AUC flat 0.757 vs 0.756; 150-pair visual
+    audit blamed it for the dominant sparse/overshrunk failures).
     """
     mask_selects, neg_points = [], []
     for i, (_, q) in enumerate(queries):
         for r in range(2):
-            mask_selects.append("smallest" if is_body_target(q["roles"][r]) else "best_iou")
+            mask_selects.append("middle" if is_body_target(q["roles"][r]) else "best_iou")
             own, partner = per_query[i * 2 + r], per_query[i * 2 + (1 - r)]
             negs = []
             for p, np_ in zip(own, partner):
