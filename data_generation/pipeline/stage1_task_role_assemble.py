@@ -62,6 +62,21 @@ ROLE_GLOSS = (
     "slide = translate a part along its linear/prismatic track; "
     "insert = mate a part into a receptacle/slot"
 )
+
+# ROLE_VERBS = ["hold", "lift", "push", "pull", "press", "slide", "rotate", "squeeze"]
+
+# ROLE_GLOSS = (
+#     "hold = hand contacts the object to stabilize, support, provide reaction force, or maintain pose without driving any state change itself; "
+#     "lift = hand grasps or cups the object/part and applies force against gravity to raise it clear of its support surface; "
+#     "push = hand applies a linear force directed away from itself, causing the object or part to translate, close, or shift position; contact is a force-application point, not a sustained pressed-against surface; "
+#     "pull = hand applies a traction force toward itself or away from the object's base, causing the part to be drawn out, opened, or separated; "
+#     "press = fingers or palm apply short-range, localised, inward normal force to trigger, activate, or displace a small-travel part; "
+#     "slide = hand presses the object or part against a plane, track, or surface and moves it along that surface in the tangential direction while maintaining normal contact pressure throughout; "
+#     "the defining feature is the combination of sustained surface contact and constrained tangential translation; "
+#     "rotate = hand applies torque to produce angular displacement about an axis; covers turn, twist, flip, and tilt as long as the primary change is rotational; "
+#     "squeeze = fingers, palm, or both hands apply inward compressive force from two or more sides, causing deformation, mechanism closure, content expulsion, or clamp closure; "
+# )
+
 RELATION_EXAMPLES = ["opposing torque", "stabilize and actuate", "balanced grip on opposite sides",
                      "opposing force", "orientation control", "guide and actuate",
                      "constrained translation"]
