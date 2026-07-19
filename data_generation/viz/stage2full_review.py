@@ -171,7 +171,7 @@ def main():
                           width=500, height=360, margin=dict(l=0, r=0, t=30, b=0), showlegend=False)
         return fig.to_json().replace("</", "<\\/")
 
-    def role_strip(oid, qd, ri, pts, renders, n_views):
+    def role_strip(oid, qd, ri, pts, renders, n_views, multi=None):
         col = (A_COL, B_COL)[ri]
         rdir = f"{OUTD}/views/{oid}/{qd}/role{'AB'[ri]}"
         os.makedirs(rdir, exist_ok=True)
@@ -185,10 +185,15 @@ def main():
             if not os.path.exists(fp):
                 im = renders[vi].copy()
                 dr = ImageDraw.Draw(im)
-                x, y = float(p[0]), float(p[1]); r = 10
-                for c2, w2 in (("white", 8), (col, 4)):
-                    dr.line([x-r, y-r, x+r, y+r], fill=c2, width=w2)
-                    dr.line([x-r, y+r, x+r, y-r], fill=c2, width=w2)
+                # 07-19 recipe: a view can carry several points (one per
+                # instance); the mask is their union — draw ALL of them
+                view_pts = ([(float(r_[1]), float(r_[2])) for r_ in multi if int(r_[0]) == vi]
+                            if multi is not None and len(multi) else [(float(p[0]), float(p[1]))])
+                for x, y in view_pts:
+                    r = 10
+                    for c2, w2 in (("white", 8), (col, 4)):
+                        dr.line([x-r, y-r, x+r, y+r], fill=c2, width=w2)
+                        dr.line([x-r, y+r, x+r, y-r], fill=c2, width=w2)
                 im.thumbnail((256, 256))
                 im.save(fp, "JPEG", quality=72)
             rel = f"views/{oid}/{qd}/role{'AB'[ri]}/view{vi:02d}.jpg"

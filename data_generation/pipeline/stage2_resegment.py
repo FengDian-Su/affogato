@@ -66,6 +66,11 @@ def main():
                 with np.load(sp, allow_pickle=True) as d:
                     if "sel_version" in d.files and int(d["sel_version"]) >= SEL_VERSION:
                         continue
+                    if "ptsA_multi" in d.files:
+                        # 07-19+ recipe output (multi-point + exist gate + 2D
+                        # overlap resolution): this single-point re-segmentation
+                        # would silently downgrade it — never touch
+                        continue
                 jobs.append((qd, m, broles))
             if not jobs:
                 skipped += 1

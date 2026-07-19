@@ -50,7 +50,7 @@ _pf = load_official_extractor()
 _UPF = _pf.UnifiedPointFormatter()
 
 
-def load_engine(gpu_memory_utilization=0.5, max_images=4, max_model_len=8192):
+def load_engine(gpu_memory_utilization=0.5, max_images=1, max_model_len=8192):
     """Start the vLLM engine + processor. Call ONCE per process, before SAM2."""
     os.environ.setdefault("VLLM_WORKER_MULTIPROC_METHOD", "spawn")
     from vllm import LLM
@@ -70,64 +70,77 @@ def render_prompt(proc, question, n_images):
     return proc.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
 
 
-def multi_image_question(molmo_query):
-    """Official multi-image template around a stage1 'Point to ...' query."""
-    label = re.sub(r"^Point to\s+", "", molmo_query.strip()).rstrip(". ")
-    return f"Point to {label} in all images."
+def p_exist_from_logprobs(logprobs0):
+    """P(target exists) from the position-0 alternatives of a k=1 pointing call.
+
+    Molmo2's trained answer templates open with '<points ...' (target present)
+    or 'There are none.' (absent) — the first generated token is the model's
+    own existence decision. Subset softmax between the two camps; other
+    openers (incl. '<|...' special tokens) are ignored. Measured on 500
+    objects: AUROC 0.912 vs hallucinated points, monotonically calibrated
+    (bucket [0.99,1] -> 94% real), while coordinate-token logprobs carry no
+    signal (AUROC 0.45).
+    """
+    from math import exp
+    p_pts = p_none = 0.0
+    for lp in logprobs0.values():
+        # normalize BPE piece markers so camp matching survives tokenizer variants
+        t = lp.decoded_token.replace("Ġ", " ").replace("▁", " ").strip().lower()
+        pr = exp(lp.logprob)
+        if t.startswith("<") and not t.startswith("<|"):
+            p_pts += pr
+        elif t.startswith("there"):
+            p_none += pr
+    tot = p_pts + p_none
+    return p_pts / tot if tot > 1e-6 else None
 
 
-def ground_queries(llm, proc, view_images, molmo_queries, k=4, max_tokens=512):
+def ground_queries(llm, proc, view_images, molmo_queries, max_tokens=512):
     """Point every query over all views in ONE llm.generate (continuous batching).
+
+    Single-image, view-by-view by design (07-19): every (query, view) is its
+    own request — all of them submitted together, so vLLM batches the whole
+    object concurrently. Per view Molmo either points (one point per visible
+    instance, adaptive count, near-duplicates <3px dropped) or declines
+    ("There are none."), and the first generated token carries its existence
+    confidence. Multi-image chunking was removed: it forced points ("in all
+    images": 64.6% vs 45.0% hallucinated-target point rate), correlated
+    errors across views (defeating the 40-view vote), and had no per-view
+    decision token.
 
     view_images: list[PIL.Image] (equal sizes)
     molmo_queries: flat list[str] of stage1-style "Point to ..." queries (the
         caller passes every query x both roles of one object, in order)
-    Returns: list (per query) of per-view [x, y] | None, plus n_oob (points
-    whose 1-based image index fell outside the chunk). A generation that hits
-    max_tokens is truncated mid-coords and parses to ZERO points for that
-    chunk — that silent failure mode is detected via finish_reason and warned
-    about loudly instead.
+    Returns: (per_query, p_exist) — per query: per-view LIST of [x, y]
+    (possibly empty), and per-view P(exist) float | None. A generation that
+    hits max_tokens parses to zero points; detected via finish_reason and
+    warned about loudly.
     """
     from vllm import SamplingParams
     T = len(view_images)
     W, H = view_images[0].size
-    reqs, keys = [], []
-    for qi, q in enumerate(molmo_queries):
-        if k == 1:
-            prompt = render_prompt(proc, q, 1)
-            for vi in range(T):
-                reqs.append({"prompt": prompt, "multi_modal_data": {"image": [view_images[vi]]}})
-                keys.append((qi, vi, 1))
-        else:
-            question = multi_image_question(q)
-            for s in range(0, T, k):
-                chunk = view_images[s:s + k]
-                reqs.append({"prompt": render_prompt(proc, question, len(chunk)),
-                             "multi_modal_data": {"image": chunk}})
-                keys.append((qi, s, len(chunk)))
-    outs = llm.generate(reqs, SamplingParams(temperature=0.0, max_tokens=max_tokens),
+    reqs = []
+    for q in molmo_queries:
+        prompt = render_prompt(proc, q, 1)
+        for vi in range(T):
+            reqs.append({"prompt": prompt, "multi_modal_data": {"image": [view_images[vi]]}})
+    outs = llm.generate(reqs, SamplingParams(temperature=0.0, max_tokens=max_tokens, logprobs=20),
                         use_tqdm=False)
-    per_query = [[None] * T for _ in molmo_queries]
-    n_oob = n_trunc = 0
-    for (qi, s, klen), out in zip(keys, outs):
-        if out.outputs[0].finish_reason == "length":
+    per_query = [[[] for _ in range(T)] for _ in molmo_queries]
+    p_exist = [[None] * T for _ in molmo_queries]
+    n_trunc = 0
+    for i, out in enumerate(outs):
+        qi, vi = divmod(i, T)
+        o = out.outputs[0]
+        if o.finish_reason == "length":
             n_trunc += 1
-        txt = out.outputs[0].text
-        if klen == 1:
-            pts = _UPF.extract_points(txt, W, H)
-            if pts:
-                per_query[qi][s] = [float(pts[0][0]), float(pts[0][1])]
-        else:
-            for ix, x, y in _UPF.extract_multi_image_points(txt, W, H):
-                ix = int(ix)
-                if 1 <= ix <= klen:               # official 1-based image index
-                    gi = s + ix - 1
-                    if per_query[qi][gi] is None:
-                        per_query[qi][gi] = [float(x), float(y)]
-                else:
-                    n_oob += 1
+        if o.logprobs:
+            p_exist[qi][vi] = p_exist_from_logprobs(o.logprobs[0])
+        lst = per_query[qi][vi]
+        for x, y in _UPF.extract_points(o.text, W, H):
+            if not any((x - px) ** 2 + (y - py) ** 2 < 9.0 for px, py in lst):
+                lst.append([float(x), float(y)])
     if n_trunc:
         print(f"WARNING molmo2_vllm: {n_trunc}/{len(reqs)} generations hit "
-              f"max_tokens={max_tokens} and were truncated — their chunks "
-              f"likely lost all points (unparseable coords tail)", flush=True)
-    return per_query, n_oob
+              f"max_tokens={max_tokens} and were truncated (zero points parsed)", flush=True)
+    return per_query, p_exist

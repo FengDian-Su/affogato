@@ -275,6 +275,34 @@ def precompute_projection(points, cameras, K_list, depths, depth_tolerance=0.05)
     return proj
 
 
+def resolve_2d_overlap(hmA, hmB, ptsA, ptsB, thr=0.5):
+    """Cross-role exclusivity at the 2D mask level, IN PLACE, one view.
+
+    Pixels claimed by BOTH roles go to the role whose own prompt point is
+    nearer (min over that role's points in this view); the loser's heatmap is
+    zeroed there, so the 3D vote never receives double-claimed evidence.
+    No-op unless both roles actually prompted this view. Assignment is by
+    prompt-point distance, not mask value (the two roles' sigmoid logits come
+    from different candidate selections and are not mutually calibrated); a
+    stray point can locally win pixels, so the existence gate + per-view point
+    dedup upstream matter.
+    """
+    if not len(ptsA) or not len(ptsB):
+        return
+    both = (hmA > thr) & (hmB > thr)
+    if not both.any():
+        return
+    ys, xs = np.nonzero(both)
+    P = np.stack([xs, ys], 1).astype(np.float32)
+    dA = np.min([np.linalg.norm(P - np.asarray(p, dtype=np.float32).reshape(1, 2), axis=1)
+                 for p in ptsA], axis=0)
+    dB = np.min([np.linalg.norm(P - np.asarray(p, dtype=np.float32).reshape(1, 2), axis=1)
+                 for p in ptsB], axis=0)
+    a_wins = dA <= dB
+    hmB[ys[a_wins], xs[a_wins]] = 0.0
+    hmA[ys[~a_wins], xs[~a_wins]] = 0.0
+
+
 def sample_heatmaps_projected(proj, heatmaps):
     """Multi-view voting with a precomputed projection: average each point's
     heatmap samples over the views that see it."""
