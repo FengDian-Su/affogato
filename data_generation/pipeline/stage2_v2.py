@@ -65,8 +65,12 @@ def parse_args():
     ap.add_argument("--skip_existing", action="store_true")
     # 07-18/19 recipe additions (each independently toggleable for ablation):
     ap.add_argument("--overlap2d", type=int, default=1)    # resolve A/B mask overlap per view
-    ap.add_argument("--exist_thr", type=float, default=0.95)
-    # first-token existence confidence gate (0 disables). P(exist) =
+    ap.add_argument("--exist_thr", type=float, default=0.9)
+    # first-token existence confidence gate (0 disables). 0.9, NOT 0.95: a real
+    # thin part can sit uniformly at ~0.88 (chin strap: 81 points, med 0.879 ->
+    # 0.95 emptied all 40 views; absent parts have the SAME per-view median, so
+    # only spatial voting separates them — the gate must stay conservative).
+    # P(exist) =
     # position-0 subset softmax '<points' vs 'There are none' — the model's own
     # trained existence decision. 500-obj calibration: AUROC 0.912; thr 0.9
     # keeps 94.3% of real-part views (97.4% of real roles keep >=1 view) and
@@ -281,6 +285,20 @@ def main():
                                            if len(sub_points[si][vi])] or [heat_sub[slots[0]][vi]])
                  for vi in range(n_views)]
                 for slots, j in zip(slots_of, range(len(per_query)))]
+            # cross-view SCALE consensus: a role's mask has one instance scale;
+            # a view whose mask is far larger than the role's cross-view median
+            # (SAM merging a grazing-angle handle into the whole body) gets its
+            # vote damped by exactly its oversize factor. No constants: weight
+            # = min(1, median_area / area). Uniform roles are untouched.
+            for j, hms in enumerate(heatmaps_all):
+                areas = np.array([(h > 0.5).mean() for h in hms])
+                pos = areas[areas > 0]
+                if len(pos) < 3:
+                    continue
+                med = float(np.median(pos))
+                for vi, a in enumerate(areas):
+                    if a > med > 0:
+                        hms[vi] *= med / a
             if args.overlap2d:   # cross-role exclusivity BEFORE the 3D vote
                 for i in range(len(queries)):
                     for vi in range(n_views):
