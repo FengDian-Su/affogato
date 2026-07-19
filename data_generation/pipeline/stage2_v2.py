@@ -285,28 +285,40 @@ def main():
                                            if len(sub_points[si][vi])] or [heat_sub[slots[0]][vi]])
                  for vi in range(n_views)]
                 for slots, j in zip(slots_of, range(len(per_query)))]
-            # cross-view SCALE consensus: a role's mask has one instance scale;
-            # a view whose mask is far larger than the role's cross-view median
-            # (SAM merging a grazing-angle handle into the whole body) gets its
-            # vote damped by exactly its oversize factor. No constants: weight
-            # = min(1, median_area / area). Uniform roles are untouched.
+            proj = sra.precompute_projection(canvas.xyz_vote, scene.cameras, scene.K_list,
+                                             scene.depth_maps, cfg.depth_tolerance)
+            # consensus validation for NAMED-PART roles: vote once, then drop
+            # any view whose mask grossly disagrees with the cross-view
+            # consensus (of the visible canvas points the mask covers, <20%
+            # lie in the consensus core). Catches SAM merging a grazing-angle
+            # handle into the whole body (2/40 such views smear diffuse score
+            # everywhere through mean-voting) WITHOUT any mask-size prior —
+            # a plate seen face-on is huge but agrees with its own consensus.
+            # Body-level roles legitimately mask the whole object: exempt.
+            body_flags = [is_body_target(q["roles"][r]) for _, q in queries for r in range(2)]
             for j, hms in enumerate(heatmaps_all):
-                areas = np.array([(h > 0.5).mean() for h in hms])
-                pos = areas[areas > 0]
-                if len(pos) < 3:
+                if body_flags[j]:
                     continue
-                med = float(np.median(pos))
-                for vi, a in enumerate(areas):
-                    if a > med > 0:
-                        hms[vi] *= med / a
+                score1, _ = sra.sample_heatmaps_projected(proj, hms)
+                core = score1 > 0.3
+                if core.sum() < 30:
+                    core = score1 > 0.15
+                    if core.sum() < 30:
+                        continue
+                for vi, h in enumerate(hms):
+                    u, v, valid = proj[vi]
+                    idx = np.where(valid)[0]
+                    if not len(idx):
+                        continue
+                    covered = idx[h[v[idx], u[idx]] > 0.5]
+                    if len(covered) >= 20 and core[covered].mean() < 0.2:
+                        hms[vi] = np.zeros_like(h)
             if args.overlap2d:   # cross-role exclusivity BEFORE the 3D vote
                 for i in range(len(queries)):
                     for vi in range(n_views):
                         sra.resolve_2d_overlap(heatmaps_all[2 * i][vi], heatmaps_all[2 * i + 1][vi],
                                                sam_pts[2 * i][vi], sam_pts[2 * i + 1][vi])
             t_sam = time.time() - t0 - t_point
-            proj = sra.precompute_projection(canvas.xyz_vote, scene.cameras, scene.K_list,
-                                             scene.depth_maps, cfg.depth_tolerance)
             idxNN = sra.knn_indices(canvas.xyz)
             n_q = process_object(rec, scene, canvas, queries, per_query, heatmaps_all, proj,
                                  idxNN, (t_point + t_sam) / len(queries), args.output_dir,
