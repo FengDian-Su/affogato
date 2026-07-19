@@ -271,10 +271,16 @@ def main():
                                                  neg_points=[n[v0:v0 + args.sam_chunk] for n in sub_negs],
                                                  mask_selects=sub_selects)
                 heat_sub = hm if heat_sub is None else [a + b for a, b in zip(heat_sub, hm)]
-            heatmaps_all = [None] * len(per_query)
-            for hms, j in zip(heat_sub, sub_owner):
-                heatmaps_all[j] = hms if heatmaps_all[j] is None else \
-                    [np.maximum(a, b) for a, b in zip(heatmaps_all[j], hms)]
+            # merge slot masks per role per view: same-instance masks average
+            # (consensus, no fringe inflation), distinct instances union
+            slots_of = [[] for _ in per_query]
+            for si, j in enumerate(sub_owner):
+                slots_of[j].append(si)
+            heatmaps_all = [
+                [sra.merge_instance_masks([heat_sub[si][vi] for si in slots
+                                           if len(sub_points[si][vi])] or [heat_sub[slots[0]][vi]])
+                 for vi in range(n_views)]
+                for slots, j in zip(slots_of, range(len(per_query)))]
             if args.overlap2d:   # cross-role exclusivity BEFORE the 3D vote
                 for i in range(len(queries)):
                     for vi in range(n_views):

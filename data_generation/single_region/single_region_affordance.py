@@ -275,6 +275,33 @@ def precompute_projection(points, cameras, K_list, depths, depth_tolerance=0.05)
     return proj
 
 
+def merge_instance_masks(masks, thr=0.5):
+    """Merge one role's per-point SAM masks for ONE view.
+
+    Points on the SAME instance produce near-identical masks whose stray
+    fringes differ — a plain max-union keeps every fringe and only ever
+    grows (measured +28% named-part support). Points on DIFFERENT instances
+    (straws) produce disjoint masks that must union. So: group masks by
+    overlap (IoU>0.5 on the >thr support = same instance), MEAN within a
+    group (consensus damps the fringes below threshold), MAX across groups.
+    """
+    if len(masks) == 1:
+        return masks[0]
+    sup = [m > thr for m in masks]
+    groups = []
+    for i, s in enumerate(sup):
+        for g in groups:
+            r = sup[g[0]]
+            inter = (s & r).sum()
+            if inter and inter / max((s | r).sum(), 1) > 0.5:
+                g.append(i)
+                break
+        else:
+            groups.append([i])
+    merged = [np.mean([masks[i] for i in g], axis=0) for g in groups]
+    return merged[0] if len(merged) == 1 else np.maximum.reduce(merged)
+
+
 def resolve_2d_overlap(hmA, hmB, ptsA, ptsB, thr=0.5):
     """Cross-role exclusivity at the 2D mask level, IN PLACE, one view.
 
