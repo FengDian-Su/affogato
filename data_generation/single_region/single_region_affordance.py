@@ -2,8 +2,8 @@
 """
 single_region_affordance.py — shared library for the stage2 grounding pipelines.
 
-Consumers: pipeline/stage2_v2.py (the production runner),
-pipeline/stage2_resegment.py, and notebook/stage02_walkthrough.ipynb. Treat every public function as having
+Consumers: pipeline/stage2_v2.py (the production runner) and
+notebook/stage02_walkthrough.ipynb. Treat every public function as having
 external callers.
 
 Contents:
@@ -343,13 +343,22 @@ def resolve_2d_overlap(hmA, hmB, ptsA, ptsB, thr=0.5):
     hmA[ys[~a_wins], xs[~a_wins]] = 0.0
 
 
-def sample_heatmaps_projected(proj, heatmaps):
+def sample_heatmaps_projected(proj, heatmaps, views=None):
     """Multi-view voting with a precomputed projection: average each point's
-    heatmap samples over the views that see it."""
+    heatmap samples over the views that see it.
+
+    views: optional per-view bool — restrict the average to these views, so
+    the denominator becomes "views that CONTRIBUTED a mask" instead of "views
+    that geometrically see the point". Without it, a view the caller silenced
+    (exist gate -> all-zero heatmap) still adds 1 to the denominator, which
+    caps every score at n_contributing / n_visible and rescales any absolute
+    threshold downstream. Identical output when every view contributes."""
     N = len(proj[0][0])
     score_sum = np.zeros(N, dtype=np.float32)
     view_counts = np.zeros(N, dtype=np.int32)
-    for (u_int, v_int, valid), heatmap in zip(proj, heatmaps):
+    for vi, ((u_int, v_int, valid), heatmap) in enumerate(zip(proj, heatmaps)):
+        if views is not None and not views[vi]:
+            continue
         sampled = np.zeros(N, dtype=np.float32)
         sampled[valid] = heatmap[v_int[valid], u_int[valid]]
         score_sum += sampled

@@ -13,7 +13,9 @@ and the retired MolmoPoint runner:
 - SAM2 runs object-batched (official set_image_batch: encoder once per
   --sam_chunk view window) with the voting projection geometry cached per object.
 - Lean outputs: per query only scores.npz + meta.json (with per-view points);
-  the stage02 notebook browser renders overlays from them on demand.
+  the stage02 notebook browser renders overlays from them on demand. The canvas
+  GT and the per-view visibility counts are NOT duplicated per query — both are
+  per-object and recoverable (see the savez call).
 - 07-17 recipe (validated on 195 queries / 50 diverse objects): "mixed+neg"
   SAM prompts (body targets -> largest candidate since 0515a93, named parts
   -> best_iou,
@@ -191,9 +193,14 @@ def process_object(rec, scene, canvas, queries, per_query, heatmaps_all, proj,
         os.makedirs(qdir, exist_ok=True)
         pexist = {key: np.array([np.nan if p is None else p for p in p_exist[j]], dtype=np.float32)
                   for key, j in (("pexistA", i * 2), ("pexistB", i * 2 + 1))}
+        # gt/counts are deliberately NOT stored: gt was a per-query copy of the
+        # canvas GT columns (bit-identical to xyzc.npy[:, 3:] on 300/300 objects
+        # checked) and counts is per-OBJECT geometry, identical across every
+        # query dir (281/281) and recomputable from proj alone — together 31% of
+        # every file, read by nothing. meta.json keeps the derived "coverage".
         np.savez_compressed(
             os.path.join(qdir, "scores.npz"),
-            xyz=canvas.xyz, gt=canvas.gt, counts=counts,
+            xyz=canvas.xyz,
             scoreA_raw=scoreA_raw, scoreB_raw=scoreB_raw, scoreA=scoreA, scoreB=scoreB,
             ptsA=ptsA, ptsB=ptsB, ptsA_multi=multiA, ptsB_multi=multiB,
             molmo_queries=np.array(mqs, dtype=object), task=str(query["task"]), **pexist)
@@ -318,16 +325,28 @@ def main():
             # everywhere through mean-voting) WITHOUT any mask-size prior —
             # a plate seen face-on is huge but agrees with its own consensus.
             # Body-level roles legitimately mask the whole object: exempt.
-            # KNOWN COUPLING with --exist_thr: score1 averages over the views
-            # that GEOMETRICALLY see a point, gated views included as zeros, so
-            # a role surviving in <6/40 views can never reach the 0.15 core
-            # level and the check silently disables itself — exactly the sparse
-            # case where one bad view weighs most. The absolute levels below
-            # were calibrated pre-gate; revisit together, not separately.
+            # score1 is averaged over the views that CONTRIBUTED a mask, not
+            # over the geometrically visible ones: the core levels below are
+            # absolute, so counting exist-gated views as zeros rescales them.
+            # With K of T views surviving the gate, score1 caps at K/T, which
+            # breaks in two ways — K/T <= 0.15 empties the core and the check
+            # turns itself off, and just above that the core shrinks to only
+            # the points nearly EVERY view covers, so almost every view then
+            # fails the 20% test and the role is erased. The second is the
+            # damaging one and it is not rare: any gating at all shifts the
+            # core, which is 18.3% of named-part roles (61/334 measured).
+            # Paired replay on identical points and identical SAM masks (13
+            # objects, 122 roles): outlier views dropped 369 -> 312, and roles
+            # the old denominator had zeroed came back — coffee-carrier side
+            # handles 0.000 -> 0.119 and 0.271 -> 0.537 raw coverage, helmet
+            # chin strap 0.005 -> 0.012. Provably identical when no view was
+            # gated; verified 61/62 such roles bit-identical, the one exception
+            # being its partner's masks moving through resolve_2d_overlap.
             for j, hms in enumerate(heatmaps_all):
                 if body_flags[j]:
                     continue
-                score1, _ = sra.sample_heatmaps_projected(proj, hms)
+                contributed = [len(p) > 0 for p in sam_pts[j]]
+                score1, _ = sra.sample_heatmaps_projected(proj, hms, views=contributed)
                 core = score1 > 0.3
                 if core.sum() < 30:
                     core = score1 > 0.15
