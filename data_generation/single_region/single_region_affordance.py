@@ -2,13 +2,12 @@
 """
 single_region_affordance.py — shared library for the stage2 grounding pipelines.
 
-Consumers: pipeline/stage2_v2.py (the production runner) and
-notebook/stage02_walkthrough.ipynb. Treat every public function as having
+Consumers: pipeline/stage2_v2.py (the production runner),
+pipeline/stage2_resegment.py, and notebook/stage02_walkthrough.ipynb. Treat every public function as having
 external callers.
 
 Contents:
-  * PipelineConfig — SAM2 checkpoint, view count, projection tolerance,
-    default mask-candidate selection.
+  * PipelineConfig — SAM2 checkpoint, projection tolerance, device.
   * G-Objaverse geometry / IO (verbatim from run_pipeline.py — proven path):
     intrinsics, camera poses, EXR depth, view loading, affogato->camera frame
     alignment.
@@ -56,13 +55,7 @@ class PipelineConfig:
     sam2_model_cfg: str = "configs/sam2.1/sam2.1_hiera_l.yaml"
 
     # --- views / geometry ---
-    num_views: int = 24
     depth_tolerance: float = 0.15      # relative depth tol for visibility test
-
-    # --- 2D mask candidate selection ---
-    mask_select: str = "best_iou"      # "best_iou" | "smallest" | "middle" | "largest"
-                                       # (default; stage2_v2 overrides per query via
-                                       # run_sam2_object_queries' mask_selects)
 
     # --- runtime ---
     device: str = "cuda:0"
@@ -189,18 +182,17 @@ def load_sam2_model(checkpoint, model_cfg, device):
 
 def _select_mask_idx(masks, iou_scores, mask_select):
     """Pick one of SAM2's 3 candidate masks. Granularities by area:
-    smallest ~ local patch, middle ~ part, largest ~ whole object;
-    best_iou = SAM2's own predicted-quality argmax (often the whole object
-    on smooth texture-less bodies)."""
-    if mask_select in ("smallest", "middle", "largest"):
+    middle ~ part, largest ~ whole visible face; best_iou = SAM2's own
+    predicted-quality argmax."""
+    if mask_select in ("middle", "largest"):
         order = np.argsort([(m > 0).sum() for m in masks])
-        return int(order[{"smallest": 0, "middle": 1, "largest": 2}[mask_select]])
+        return int(order[{"middle": 1, "largest": 2}[mask_select]])
     return int(np.argmax(iou_scores))
 
 
 def run_sam2_object_queries(view_images_np, queries_points, sam2_predictor, cfg: PipelineConfig,
                             neg_points=None, mask_selects=None):
-    """SAM2 for ALL queries of one object with the encoder run ONCE.
+    """SAM2 for ALL queries of one view window, encoder run once per window.
 
     Official batch API: set_image_batch embeds every view a single time, then
     predict_batch (decoder-only, ~ms/view) runs per query.
@@ -209,8 +201,7 @@ def run_sam2_object_queries(view_images_np, queries_points, sam2_predictor, cfg:
     neg_points:     optional, same nesting: one negative point (or None) per
                     query per view, passed to SAM with label 0 (the partner
                     role's point separates e.g. mug body from handle masks).
-    mask_selects:   optional per-query candidate-selection override (else
-                    cfg.mask_select for every query).
+    mask_selects:   per-query candidate selection (required).
     Returns: list over queries of heatmap lists (list[T] of [H,W] float32).
     """
     T = len(view_images_np)
@@ -233,7 +224,7 @@ def run_sam2_object_queries(view_images_np, queries_points, sam2_predictor, cfg:
         masks_b, ious_b, _ = sam2_predictor.predict_batch(
             point_coords_batch=coords, point_labels_batch=labels,
             multimask_output=True, return_logits=True)
-        select = mask_selects[qi] if mask_selects is not None else cfg.mask_select
+        select = mask_selects[qi]
         hms = []
         for vi in range(T):
             if len(points_per_view[vi]) == 0:

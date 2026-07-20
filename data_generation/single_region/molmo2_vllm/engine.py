@@ -2,7 +2,7 @@
 
 Validated 2026-07-11 on the 10-object human-GT benchmark (scratchpad
 vllm_m2_point.py / vllm_m2_score.py): k=1 parity with transformers 0.847-vs-0.844
-meanAUC; k=4 multi-image 0.827/0.842; 96-113 ms/view = ~15x transformers serial.
+meanAUC; 96-113 ms/view = ~15x transformers serial.
 
 Everything official:
 - engine: vLLM 0.16 native Molmo2 support (`molmo` conda env, torch 2.9.1+cu128).
@@ -11,15 +11,13 @@ Everything official:
   bimanual_annotation/gemma.py) and mm_encoder_attn_backend="TORCH_SDPA" (vLLM's
   bundled flash-attn kernels raise cudaErrorUnsupportedPtxVersion on sm_120 with
   this driver — verified on 0.16/cu128 AND 0.22-nightly/cu129).
-- prompts: multi-image question from the official training template
-  GENERAL_PROMPTS_V1["multi_image_pointing"] ("Point to {label} in all images.");
-  single-image = the stage1 molmo_query verbatim.
+- prompts: the stage1 molmo_query verbatim, one image per request
+  (multi-image chunking retired 07-19, commit 3c500b3).
 - parsing: point_formatter_official.py (verbatim copy of AI2 molmo2 repo
   olmo/preprocessing/point_formatter.py) — coords="idx x y" triplets, /1000
   scale, 1-based image indices.
 """
 import os
-import re
 import sys
 import types
 import importlib.util

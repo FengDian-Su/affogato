@@ -4,7 +4,7 @@
 For (oid, qdir) pairs present in BOTH outputs/bimanual_grounding (old prod,
 July 4) and outputs/stage2_full (new prod), render a 4-row figure with the
 SAME renderer/cameras: OLD raw, OLD final, NEW raw, NEW final; 4 azimuths.
-Run: mm python comp_render.py [n_samples] [seed]
+Run: mm python compare_old_new_render.py [n_samples] [seed]
 """
 import os, sys, json, random
 import numpy as np
@@ -62,9 +62,9 @@ def render_pair(job):
         draw_row(fig, r, 4, xyz.astype(np.float32), sA, sB, lab)
     ro, rn = mo["roles"], mn["roles"]
     ttl = (f"{mn.get('object_name','?')} — {mn['task']}\n"
-           f"OLD  A:{ro[0].get('region')} | B:{ro[1].get('region')}\n"
-           f"NEW  A:{rn[0].get('region')} ({rn[0].get('target')}) | "
-           f"B:{rn[1].get('region')} ({rn[1].get('target')})")
+           f"OLD  A:{ro[0].get('contact_region')} | B:{ro[1].get('contact_region')}\n"
+           f"NEW  A:{rn[0].get('contact_region')} ({rn[0].get('target')}) | "
+           f"B:{rn[1].get('contact_region')} ({rn[1].get('target')})")
     fig.suptitle(ttl, fontsize=10)
     fig.subplots_adjust(left=0.03, right=0.99, top=0.92, bottom=0.01,
                         wspace=0.0, hspace=0.02)

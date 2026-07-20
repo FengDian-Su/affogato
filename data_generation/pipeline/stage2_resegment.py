@@ -1,6 +1,7 @@
 #!/usr/bin/env python
-"""Re-segment stage2_full with the middle_body selection fix — NO Molmo re-run.
+"""Re-segment stage2_full body roles from stored Molmo points — NO Molmo re-run.
 
+Historical tool: it applied the 07-17 middle-candidate fix to the k=4 dataset.
 For every query with >=1 body-like-target role (body/wall/surface): re-run
 SAM2 from the stored Molmo points with mask_select="middle" for body-like
 roles (named-part roles keep their stored raw — their selection is unchanged),
@@ -8,9 +9,9 @@ re-vote, refine, partition (long-axis rule), prune, and rewrite scores.npz
 atomically. Queries with no body-like role are untouched.
 
 Idempotent: skips queries whose npz already has sel_version >= 3.
-Usage: resegment_v2.py <gpu_id> <shard_idx> <num_shards> [sam_chunk=20]
+Usage: stage2_resegment.py <gpu_id> <shard_idx> <num_shards> [sam_chunk=20]
 """
-import os, sys, json, time
+import os, sys, json
 GPU, SHARD, NSHARD = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
 CHUNK = int(sys.argv[4]) if len(sys.argv) > 4 else 20
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
@@ -20,7 +21,6 @@ DG = "/home/michaellee/mclee/affogato/data_generation"
 sys.path.insert(0, DG)
 FULL = f"{DG}/outputs/stage2_full"
 NEG_MIN_PX = 30
-BODY = ("body", "wall", "surface")
 SEL_VERSION = 3
 
 
@@ -46,7 +46,7 @@ def main():
     oids = [o for i, o in enumerate(oids) if i % NSHARD == SHARD]
     print(f"shard {SHARD}/{NSHARD} on GPU {GPU}: {len(oids)} objects", flush=True)
 
-    cfg = sra.PipelineConfig(num_views=40)
+    cfg = sra.PipelineConfig()
     sam2 = sra.load_sam2_model(cfg.sam2_checkpoint, cfg.sam2_model_cfg, cfg.device)
 
     done = skipped = failed = 0

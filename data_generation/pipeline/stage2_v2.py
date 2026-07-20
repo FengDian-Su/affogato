@@ -15,7 +15,8 @@ and the retired MolmoPoint runner:
 - Lean outputs: per query only scores.npz + meta.json (with per-view points);
   the stage02 notebook browser renders overlays from them on demand.
 - 07-17 recipe (validated on 195 queries / 50 diverse objects): "mixed+neg"
-  SAM prompts (body targets -> middle candidate, named parts -> best_iou,
+  SAM prompts (body targets -> largest candidate since 0515a93, named parts
+  -> best_iou,
   partner point as negative beyond 30px), canvas refinement (satellite prune +
   kNN smoothing), partition v6 (text symmetry -> canvas-axis center cut, text
   vertical -> gravity cut, else evidence split with full overlap resolution),
@@ -97,10 +98,18 @@ BODY_SELECT = "largest"  # SAM candidate for body targets (overridable via --bod
 
 
 def is_body_target(role):
-    # SAM mask-selection rule; narrower than sra.BODY_TARGET_RE (the partition
-    # gate) — calibrated separately, do not unify.
-    tgt = str(role.get("target", "")).lower()
-    return "body" in tgt or "wall" in tgt or "surface" in tgt
+    """Is this role's target the object body itself (-> whole-face mask)?
+
+    EXACT match on stage1's own target label, not a substring test: 437 of 442
+    body-level roles measured are literally "body", while every compound that
+    the old substring rule caught ("pink surface", "the frame/wall the hinges
+    are mounted to", "wall mount base", "body base", "upper body/tip") is a
+    SPECIFIC region for which the whole-face mask is wrong — the mouse's pink
+    surface became a band across the whole mouse. Named parts take best_iou.
+    Narrower than sra.BODY_TARGET_RE (the partition gate) — calibrated
+    separately, do not unify.
+    """
+    return str(role.get("target", "")).strip().lower() == "body"
 
 
 def expand_sam_subqueries(queries, sam_pts):
@@ -109,9 +118,9 @@ def expand_sam_subqueries(queries, sam_pts):
     (multi-instance targets need one mask per instance, not one multi-positive
     blob); the caller max-merges slots back into the role's heatmaps.
 
-    Per sub-query: candidate selection ("mixed" recipe: body-level targets ->
-    MIDDLE SAM candidate, named parts -> best_iou; smallest retired 07-17 —
-    it collapses onto paint/decal patches) and the partner role's first point
+    Per sub-query: candidate selection (target exactly "body" -> the LARGEST
+    candidate = whole visible face; every other target -> best_iou) and the
+    partner role's first point
     as a negative prompt when it sits >NEG_MIN_PX from THIS slot's positive
     (separates e.g. mug handle from body masks without ever giving SAM a
     near-coincident positive/negative pair).
@@ -197,7 +206,8 @@ def process_object(rec, scene, canvas, queries, per_query, heatmaps_all, proj,
             "hitA": int(np.isfinite(ptsA[:, 0]).sum()), "hitB": int(np.isfinite(ptsB[:, 0]).sum()),
             "coverage": float((counts > 0).mean()),
             "engine": {"name": "molmo2-vllm", "k": 1, "sam2": "object-batched",
-                       "recipe": "mixed+neg / refine / partition-v6 / post-prune",
+                       "recipe": "mixed+neg / exist-gate / consensus-validation / "
+                                 "2d-overlap / refine / partition-v6 / post-prune",
                        **recipe_flags},
             "seconds": round(time.time() - t0 + t_share, 1),
         }
@@ -222,7 +232,7 @@ def main():
     from single_region.single_region_affordance import (build_aff_map, resolve_object,
                                                         load_canvas, load_scene)
 
-    cfg = sra.PipelineConfig(num_views=args.num_views)
+    cfg = sra.PipelineConfig()
     sam2_predictor = sra.load_sam2_model(cfg.sam2_checkpoint, cfg.sam2_model_cfg, cfg.device)
 
     recs = [r for r in json.load(open(args.stage1)) if not r.get("error")]

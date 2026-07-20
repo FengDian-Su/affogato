@@ -1,17 +1,14 @@
 #!/usr/bin/env python
 """stage2_full review v2 — full-fidelity clone of bimanual_grounding_en:
-dark page, white cards with badges + FULL texts, static cloud PNG, lazy
-interactive plotly (FINAL/raw), and per-role <details> 40-view strips of
+dark page, white cards with badges + FULL texts, lazy interactive plotly
+(FINAL/raw), and per-role <details> 40-view strips of
 Molmo point overlays (written to views/... like v1's relative tree).
 SAM per-view masks are not stored by the v2 runner; strips note that.
-Run: ~/miniconda3/envs/mm/bin/python stage2full_review_v2.py [start end]
+Run: ~/miniconda3/envs/mm/bin/python stage2full_review.py [start end]
 """
-import os, sys, json, io, base64
+import os, sys, json
 import html as _html
 import numpy as np
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw
 
 DG = "/home/michaellee/mclee/affogato/data_generation"
@@ -127,21 +124,6 @@ def main():
         extra = " · <a style='color:#7c9cff' href='byname_index.html'>名稱目錄</a>" if BYNAME else ""
         return f"<div style='padding:6px 32px;color:#9aa3af;font-size:13px'>頁 {' '.join(links)} / {n_pages_total}{extra}</div>"
 
-    def cloud_png(xyz, sA, sB):
-        sub = np.random.RandomState(0).choice(len(xyz), min(7000, len(xyz)), replace=False)
-        X = xyz[sub]; a, b = sA[sub] > THR, sB[sub] > THR
-        fig = plt.figure(figsize=(5.2, 2.6))
-        ax = fig.add_subplot(111, projection="3d")
-        ax.scatter(X[:, HOR[0]], X[:, HOR[1]], X[:, UP], s=0.7, c="lightgrey", alpha=0.45, linewidths=0)
-        ax.scatter(X[a & ~b, HOR[0]], X[a & ~b, HOR[1]], X[a & ~b, UP], s=2.2, c=A_COL, linewidths=0)
-        ax.scatter(X[b & ~a, HOR[0]], X[b & ~a, HOR[1]], X[b & ~a, UP], s=2.2, c=B_COL, linewidths=0)
-        ax.view_init(elev=18, azim=-60)
-        try: ax.set_box_aspect(np.ptp(X[:, [HOR[0], HOR[1], UP]], 0))
-        except Exception: pass
-        ax.set_axis_off(); fig.tight_layout(pad=0)
-        buf = io.BytesIO(); fig.savefig(buf, format="png", dpi=92); plt.close(fig)
-        return base64.b64encode(buf.getvalue()).decode()
-
     def plot_spec(xyz, d):
         rng = np.random.RandomState(0)
         base = rng.choice(len(xyz), min(3000, len(xyz)), replace=False)
@@ -171,7 +153,7 @@ def main():
                           width=500, height=360, margin=dict(l=0, r=0, t=30, b=0), showlegend=False)
         return fig.to_json().replace("</", "<\\/")
 
-    def role_strip(oid, qd, ri, pts, renders, n_views, multi=None):
+    def role_strip(oid, qd, ri, pts, renders, n_views):
         col = (A_COL, B_COL)[ri]
         rdir = f"{OUTD}/views/{oid}/{qd}/role{'AB'[ri]}"
         os.makedirs(rdir, exist_ok=True)
@@ -185,15 +167,10 @@ def main():
             if not os.path.exists(fp):
                 im = renders[vi].copy()
                 dr = ImageDraw.Draw(im)
-                # 07-19 recipe: a view can carry several points (one per
-                # instance); the mask is their union — draw ALL of them
-                view_pts = ([(float(r_[1]), float(r_[2])) for r_ in multi if int(r_[0]) == vi]
-                            if multi is not None and len(multi) else [(float(p[0]), float(p[1]))])
-                for x, y in view_pts:
-                    r = 10
-                    for c2, w2 in (("white", 8), (col, 4)):
-                        dr.line([x-r, y-r, x+r, y+r], fill=c2, width=w2)
-                        dr.line([x-r, y+r, x+r, y-r], fill=c2, width=w2)
+                x, y, r = float(p[0]), float(p[1]), 10
+                for c2, w2 in (("white", 8), (col, 4)):
+                    dr.line([x-r, y-r, x+r, y+r], fill=c2, width=w2)
+                    dr.line([x-r, y+r, x+r, y-r], fill=c2, width=w2)
                 im.thumbnail((256, 256))
                 im.save(fp, "JPEG", quality=72)
             rel = f"views/{oid}/{qd}/role{'AB'[ri]}/view{vi:02d}.jpg"
