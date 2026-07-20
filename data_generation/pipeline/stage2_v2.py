@@ -65,6 +65,14 @@ def parse_args():
     ap.add_argument("--skip_existing", action="store_true")
     # 07-18/19 recipe additions (each independently toggleable for ablation):
     ap.add_argument("--overlap2d", type=int, default=1)    # resolve A/B mask overlap per view
+    ap.add_argument("--body_select", default="largest",
+                    choices=["middle", "largest", "best_iou"])  # SAM candidate for body targets.
+    # largest = the whole visible face. middle collapsed onto painted patches /
+    # printed stripes when the stage1 contact_region named one ("the side wall
+    # WITH THE RED STRIPE"): body-role coverage on 6 worst fresh cases
+    # 0.05-0.42 -> 0.48-0.53 (matches/beats PROD k4), diff-target part cov and
+    # A/B overlap both unchanged (2D-overlap holds the boundary). best_iou was
+    # unstable (still bit stripes: trash-can 0.20). smallest retired 07-17.
     ap.add_argument("--exist_thr", type=float, default=0.9)
     # first-token existence confidence gate (0 disables). 0.9, NOT 0.95: a real
     # thin part can sit uniformly at ~0.88 (chin strap: 81 points, med 0.879 ->
@@ -85,6 +93,7 @@ def slugify(text, n=40):
 
 
 NEG_MIN_PX = 30      # partner point becomes a SAM negative only beyond this distance
+BODY_SELECT = "largest"  # SAM candidate for body targets (overridable via --body_select)
 
 
 def is_body_target(role):
@@ -109,7 +118,7 @@ def expand_sam_subqueries(queries, sam_pts):
 
     Returns (sub_points, sub_owner, sub_selects, sub_negs), parallel lists.
     """
-    selects = ["middle" if is_body_target(q["roles"][r]) else "best_iou"
+    selects = [BODY_SELECT if is_body_target(q["roles"][r]) else "best_iou"
                for _, q in queries for r in range(2)]
     sub_points, sub_owner, sub_selects, sub_negs = [], [], [], []
     for j, pq in enumerate(sam_pts):
@@ -203,6 +212,8 @@ def main():
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
     os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
     os.chdir(DATA_GEN)
+    global BODY_SELECT
+    BODY_SELECT = args.body_select
 
     # heavy imports AFTER the GPU pin; vLLM engine BEFORE SAM2 (it profiles GPU memory)
     from single_region.molmo2_vllm import engine as m2v
