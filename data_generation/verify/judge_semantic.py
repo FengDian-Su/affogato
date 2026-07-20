@@ -7,7 +7,7 @@ and verify the acceptance holds on the actual geometry. Flags the junk taxonomy 
 image-verified audit confirmed (2026-07-20): multi-object scenes, corrupted/degenerate meshes,
 flat slivers/graphic panels, human figures/statues, one-hand tiny items, ungrounded components.
 
-Output: outputs/stage0_full/judge_part{N}.json — one record per kept object:
+Output: outputs/stage0/<category>/judge_part{N}.json — one record per kept object:
   {object_id, object_name, verdict: ok|junk, junk_types: [...], actual_object,
    components_grounded, ungrounded_components, notes}
 Resume: re-running skips object_ids already judged (error stubs re-run). One model load for the
@@ -184,7 +184,7 @@ def run_part(model, part, in_path, out_path, batch_size):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--dir", default="outputs/stage0_full")
+    ap.add_argument("--dir", default="outputs/stage0/<category>")
     ap.add_argument("--parts", default="0-12", help="e.g. 0-12 or 3")
     ap.add_argument("--gpu", type=int, default=0)
     ap.add_argument("--batch_size", type=int, default=8)

@@ -4,7 +4,8 @@ internal consistency, anomaly signals. Writes flagged records + stats to scratch
 import json, os, sys
 from collections import Counter, defaultdict
 
-OUT = '/home/michaellee/mclee/affogato/data_generation/outputs/stage0_full'
+OUT = os.environ.get('STAGE0_DIR',
+    '/home/michaellee/mclee/affogato/data_generation/outputs/stage0/daily_used')
 SCRATCH = os.path.dirname(os.path.abspath(__file__))
 MAP = '/home/michaellee/mclee/affogato/data_generation/dataset/daily_used_to_affogato.json'
 
@@ -23,8 +24,10 @@ FILT_REQ = {"everyday_object", "bimanual_task_exists", "example_task", "keep"}
 def flag(issue, part, oid, detail=""):
     flags[issue].append((part, oid, str(detail)[:160]))
 
-for i in range(13):
-    rs = json.load(open(f'{OUT}/stage0_part{i}.json'))
+import glob
+PARTS = sorted(f for f in glob.glob(f'{OUT}/stage0_part*.json') if not f.endswith('.kept.json'))
+for i, pf in enumerate(PARTS):
+    rs = json.load(open(pf))
     for r in rs:
         oid = r.get('object_id', '?')
         stats['records'] += 1

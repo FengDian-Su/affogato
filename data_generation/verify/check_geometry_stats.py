@@ -29,7 +29,7 @@ from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT_DEFAULT = os.path.join(os.path.dirname(HERE), "outputs", "stage0_full")
+OUT_DEFAULT = os.path.join(os.path.dirname(HERE), "outputs", "stage0", "daily_used")
 
 THIN = 0.04        # hairline threshold: min silhouette bbox dim / image size
 SLAB = 0.85        # underside fg-area ratio above which it's a ground slab
@@ -93,9 +93,12 @@ def main():
         recs = [r for r in json.load(open(args.calib)) if r.get("keep")]
         out = args.out or os.path.splitext(args.calib)[0] + ".geomflags.json"
     else:
+        import glob as _glob
         recs = []
-        for p in range(13):
-            recs += [r for r in json.load(open(f"{args.dir}/stage0_part{p}.json")) if r.get("keep")]
+        for f in sorted(_glob.glob(f"{args.dir}/stage0_part*.json")):
+            if f.endswith(".kept.json"):
+                continue
+            recs += [r for r in json.load(open(f)) if r.get("keep")]
         out = args.out or os.path.join(args.dir, "geomflags.json")
     print(f"analyzing {len(recs)} kept objects with {args.workers} workers")
 

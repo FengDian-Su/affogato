@@ -36,12 +36,18 @@ from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))                 # data_generation/verify/
 DATA_GEN = os.path.dirname(HERE)
-DEFAULT_DIR = os.path.join(DATA_GEN, "outputs", "stage0_full")
-NPARTS = 13
+DEFAULT_DIR = os.path.join(DATA_GEN, "outputs", "stage0", "daily_used")
 
 
 def part_files(d):
-    return [(p, os.path.join(d, f"stage0_part{p}.json")) for p in range(NPARTS)]
+    """Every stage0_part{N}.json in the dir, N-ordered (part count varies per category)."""
+    import glob, re
+    out = []
+    for f in glob.glob(os.path.join(d, "stage0_part*.json")):
+        m = re.search(r"stage0_part(\d+)\.json$", f)
+        if m:
+            out.append((int(m.group(1)), f))
+    return sorted(out)
 
 
 def load_kept(d):
@@ -80,7 +86,7 @@ def merge_flags(d):
     """Combine both screens into qc_flags.json: one record per flagged object + its evidence."""
     kept = load_kept(d)
     sem = {}
-    for p in range(NPARTS):
+    for p, _ in part_files(d):
         f = os.path.join(d, f"judge_qwen_part{p}.json")
         if os.path.exists(f):
             for r in json.load(open(f)):

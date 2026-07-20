@@ -20,7 +20,7 @@ pre-apply files are copied to `pre_apply_backup/`; `restore` undoes it.
 ## 1. Structural check (deterministic, full coverage, seconds)
 
 ```bash
-python verify/check_structural.py            # paths at top of file default to outputs/stage0_full
+python verify/check_structural.py            # paths at top of file default to outputs/stage0/<category>
 ```
 
 Scans EVERY record for: schema/field completeness, filter-dict shape, keep-logic coherence
@@ -40,7 +40,7 @@ filter (cross-family rule: a family must never verify its own decisions - gemma 
 ablation only). Checks: single-object, geometry integrity, identity-vs-name, two-hand
 manipulability, component groundedness. Output `judge_qwen_part{N}.json` per part; resume-safe.
 The judge is a SCREEN: tune/accept it for high junk-recall; precision is delegated to layer 3.
-Long runs: use `outputs/stage0_full/run_judge_full.sh` (driver) + `monitor_judge.sh` (watchdog)
+Long runs: use `outputs/stage0/<category>/run_judge_full.sh` (driver) + `monitor_judge.sh` (watchdog)
 in tmux.
 
 ## 3. Calibration + arbitration (Claude)
