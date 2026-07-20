@@ -1,0 +1,1602 @@
+[
+ {
+  "object_id": "9dcbcccee8294f48a0db1dc1fe2d615f",
+  "object_name": "Chair",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Geometry is an open cubic frame with no seat panel (minimalist furniture/side-table frame), but it reads as real movable furniture and a two-hand carry is valid; body-only components fit the featureless frame."
+ },
+ {
+  "object_id": "1844319d768f4d62a25eb33babea5903",
+  "object_name": "Teapot",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "d530187b5d2a4a1c8891b62272c15570",
+  "object_name": "T-shirt",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Garment is rendered on a mannequin stand (pole and round base are part of the geometry), but the components sensibly cover only the garment (body, neckline, sleeves), all visible."
+ },
+ {
+  "object_id": "afabd87342054f74bdebf12854aa665e",
+  "object_name": "Red Gas Can",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Views 0/6 alone look like a red slab, but view 2 clearly shows a jerry can with integrated top handle and cylindrical spout cap matching all listed components."
+ },
+ {
+  "object_id": "ec907dc8e7f34ad09e455883701261e6",
+  "object_name": "Toilet",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "Geometry is an industrial high-bay lamp housing (bell reflector dome + ballast box + mounting stub), not a toilet or a container; carrying it two-handed is defensible but it is a mounted fixture. Components invent container semantics: the 'top knob' is a mounting stub and the 'lid that lifts off the base' is just the dome/box seam, not an openable lid."
+ },
+ {
+  "object_id": "01cc2bb53291464fb304b75d180d8a34",
+  "object_name": "Teapot",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "34d2e353e7b04723b8f962a38870b514",
+  "object_name": "Teapot",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "d233c16594724deea5bca97c8e36d8c1",
+  "object_name": "Film Reel Bookends",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Film-reel-themed but functionally bookends (central block flanked by reel discs); repositioning with both hands is a real task, and body-only is fine since the reels are not operable parts."
+ },
+ {
+  "object_id": "a923e07ec811492f8ebb384c006c2685",
+  "object_name": "Power Connector",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "A small panel-mount XLR-style connector: hardware component rather than an everyday pick-up-and-use object, and essentially one-hand-sized; the two-hand plug/install task is thin but defensible. Pins and mounting flange are clearly visible."
+ },
+ {
+  "object_id": "519c2a6a2a0f4a1d80fbc7c4c571c7a7",
+  "object_name": "Book",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Leather-bound album with visible page block (page corners stick out), matching the body+pages components."
+ },
+ {
+  "object_id": "5a22d32765c54ca8b59939d3ced032f8",
+  "object_name": "Bench",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Geometry is a crude low-poly anvil-like faceted lump on a base plate, not a bench; a heavy two-hand lift keeps it defensible, but the shape is close to an abstract solid. Body-only components fit."
+ },
+ {
+  "object_id": "95eb2d9e35974fa3ba98968e5bdb62b6",
+  "object_name": "Bucket Hat",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Plain low-poly wide-brim hat; body and brim both visible."
+ },
+ {
+  "object_id": "282de5a4c82944eead7b3991ca4a1340",
+  "object_name": "Cycling Jersey",
+  "label": "junk",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "The render is a full human figure (head, bare arms, hands, legs, feet) wearing a jersey and shorts, i.e. a clothed mannequin/character, which the contract rejects; the 'neck opening allows the head to pass through' and 'arm openings' components contradict the geometry since the body already occupies the garment."
+ },
+ {
+  "object_id": "71ac1fbc65df4e9794bc5fcc76ad3e13",
+  "object_name": "Box of Cartridges",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "Small vintage Winchester cartridge box is a legitimate keep (stabilize-and-open task), but the telescoping lid lip visible below the top face in views 0 and 3 — and cited in the filter's own example task — is not listed as a component (body only)."
+ },
+ {
+  "object_id": "b4ee69307b9948e1b94e20d1917a5cf9",
+  "object_name": "Shisha (Hookah)",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Side views confirm the hose curving from the neck to the floor with a long rigid mouthpiece; tray, stem, and base all visible."
+ },
+ {
+  "object_id": "5dcf9300148243b1b95f3d1c3769f307",
+  "object_name": "Swirled Bread",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Real cinnamon-roll scan; food item handled with both hands (breaking apart) is a plausible everyday bimanual task; body-only is appropriate."
+ },
+ {
+  "object_id": "d4f2c598e6be47a498af912f6baa6260",
+  "object_name": "Hooked Bucket",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "Odd toy-like composite: small green bucket with loop handle on top of a long orange shaft — plausibly a long-handled scoop/dipper but identity unclear; the 'hooked stem' component mischaracterizes a straight tapered shaft with a rounded knob end — no hook is visible, so 'used to hook onto other objects' does not match the geometry."
+ },
+ {
+  "object_id": "2cf41e5ed76c409a9966c4828246ee45",
+  "object_name": "Can",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Low-poly beverage can; the pull tab stub and the tan top rim are visible, and hold-while-pulling-the-tab is a genuine two-hand task."
+ },
+ {
+  "object_id": "78e1a7ff244043a6bf5a575976f7c317",
+  "object_name": "Aquarium",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "Geometry is actually an opaque cooler/lockbox with an open hinged lid — a fine functional container keep — but the body is described as 'transparent' though it is dark and opaque, and the 'side handle' is the front latch clasp (whose real function, unlatching, is what the example task cites) rather than a recessed carrying grip."
+ },
+ {
+  "object_id": "4c5055954c154288b741d56f9cbebb1e",
+  "object_name": "Electrical Box",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Plain box with a clearly visible circular hole in the front face (views 2/4) and a small side knob, so all listed components are grounded; two-hand hold-and-manipulate is reasonable."
+ },
+ {
+  "object_id": "8a6340c963594b5cb2b869292da33d07",
+  "object_name": "Incense Burner",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Lidded pot with knob and visible lid seam on top; components all match."
+ },
+ {
+  "object_id": "c70ff3faba3a4c61bacb76bdd8b65fb2",
+  "object_name": "Toilet Paper Roll",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "Roll shape with ragged paper texture is plausible and the hold-while-tearing task is fine, but both cylinder ends render as solid faces — no core hole is visible in any view, so the 'inner rim / edge of the opening' component is invented from the category name."
+ },
+ {
+  "object_id": "4426864ade83440fbeaa41c73ec2a49d",
+  "object_name": "Box",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Plain featureless box; contract explicitly allows a plain box kept for two-hand carry, and body-only is the right component set."
+ },
+ {
+  "object_id": "b72f395225614569b6e582a7e9b7183f",
+  "object_name": "Desk",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Modular boxy furniture with vent slits, an upper C-shaped shelf unit, and a rear loop; movable furniture with a valid two-hand move task, and the listed shelf unit and desk surface map to visible geometry."
+ },
+ {
+  "object_id": "0f2b2014bb0945ea91ab650934ba6a49",
+  "object_name": "Straw Hat",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Sombrero-style straw hat with clearly visible crown and brim matching the components."
+ },
+ {
+  "object_id": "c7042095cd8344b3a7c75acce822fc4d",
+  "object_name": "Building Blocks",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "382d25186f5b454381f281014eb86915",
+  "object_name": "Egg",
+  "label": "junk",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "Views show an irregular hollow shell fragment (underside is a concave mask-like shell with winged edges), not an egg; even as an egg it is a tiny one-hand object with no real bimanual task, and the 'recessed grip' component is just the hollow interior."
+ },
+ {
+  "object_id": "635742a099284bda836976c7783c58f4",
+  "object_name": "Serving Dish",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Green round basin with two wire spring clips and a wide base rim, all listed components visible; possibly a poultry-feeder-style dish but functionally a container either way."
+ },
+ {
+  "object_id": "53a53517635f494185eb19264f1b19b0",
+  "object_name": "Traffic Cone",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "0c94dd78e6ea4a22909614763d16207f",
+  "object_name": "Teapot",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Stylized cube-bodied teapot but all listed parts (two loop handles, spout, lid with knob) are clearly visible in the renders."
+ },
+ {
+  "object_id": "cffe0a96722a43de81c01ff788e960fa",
+  "object_name": "Pliers",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Geometry is a single-handle clamp-like tool (flat handle with hang-hole, pivot screw, two paddle jaws) rather than classic two-handle pliers, but it is a plausible functional hand tool and the listed jaws/pivot screw are visible."
+ },
+ {
+  "object_id": "3e483f51bca344c891d4fbaef3f8aec2",
+  "object_name": "Knife",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "It is a push-dagger (T-grip knuckle handle plus blade) rather than a kitchen knife, but a real functional knife; handle cutouts and blade match the components."
+ },
+ {
+  "object_id": "c8dfc7785b524ed291a0e11ae9eb0ce3",
+  "object_name": "Trading Card",
+  "label": "junk",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "All views show a thin flat card slab (renders edge-on as a line); this is a flat graphic panel and a tiny one-hand object — the 'both hands to place into a sleeve' task is not a meaningful coordinated bimanual task."
+ },
+ {
+  "object_id": "63de17872824491297f4effa1fadffde",
+  "object_name": "Game Boy-like handheld device",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "The object is a plain blue mottled slab with speaker-grille grooves and two small side nubs — no screen, no yellow d-pad, no action/menu/start-select buttons are visible anywhere, so most listed components are hallucinated from the name; keep is defensible only as a generic handheld device shell."
+ },
+ {
+  "object_id": "1ef16ef5944c4109a1a12d642147e61f",
+  "object_name": "Lamp",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Untextured egg-shaped shell with a spike tip and tiered base; no lamp features (no aperture, cord, or bulb), so it could equally be a decorative egg ornament/finial — lamp reading is defensible but not evidenced; the three listed parts are visible."
+ },
+ {
+  "object_id": "1ffad21b65434db99e02f11943d55684",
+  "object_name": "Bell",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Low-poly yellow bell; the 'loop' appears only as a thin rod side-on and a bar in top-down (a vertical ring seen edge-on), which is consistent though not conclusive."
+ },
+ {
+  "object_id": "815c4466ea7241669aaf0b91198fc92a",
+  "object_name": "Ashtray",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "Views show a decorative marquetry wood block with a wavy sculpted two-peak top and inlay patterns — there is no carved basin/recess anywhere, so the 'recessed center' component is invented and the object is a decorative sculpture, not an ashtray."
+ },
+ {
+  "object_id": "e025e2b1f2a6471bb0dae480ecc9e02a",
+  "object_name": "Trowel",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "f0786f1597424dcf997d1ba73d6a705e",
+  "object_name": "Number Lamp",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "Genuine table-lamp geometry (shade, stem, base; texture is a numbered UV-test pattern), but the lampshade — the most obvious grippable/removable part, referenced in the record's own example task — is missing from the components (only body and base listed)."
+ },
+ {
+  "object_id": "ab798eed2dd04145bcf82af101dd8cf0",
+  "object_name": "Mining Pickaxe",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Stylized game-prop look (teal-striped white shaft, curved dark head), but geometry is a functional two-hand pickaxe; head not listed as a component, though it is not an operable/grip part."
+ },
+ {
+  "object_id": "56025031f3e1407391242b66b97bc4c5",
+  "object_name": "Wooden crate",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Actually a cluster of three stacked wooden crates rather than a single crate; single 'body' component is acceptable but coarse for a multi-object group."
+ },
+ {
+  "object_id": "a04cab737cc74da38e3658a4cbe6a2d4",
+  "object_name": "Pot",
+  "label": "junk",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "All views show a featureless solid closed cylinder — flat sealed top disk, solid underside, no opening, lip, or hollow interior — an abstract primitive, not a pot; the 'rim' component does not exist on the geometry."
+ },
+ {
+  "object_id": "5b366271e4b947ff80199cad6b1f3e7d",
+  "object_name": "Bowl",
+  "label": "junk",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "The mesh is an inverted dome fused onto a large flat square slab (ground-plane scan artifact); there is no bowl cavity in any view, so it is an abstract scene fragment, and the 'body' description ignores the attached slab that makes it non-liftable as a bowl."
+ },
+ {
+  "object_id": "bbedb110eac2450e9d5ca6df5d21d374",
+  "object_name": "Axe",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Scanned tool is a small pick/chisel-like hand tool with a wooden shaft and small metal blade head rather than an axe, but it is a real functional tool; 'axe head' loosely matches the visible metal head."
+ },
+ {
+  "object_id": "4444406efa4c4d8599fad906e1c55cbe",
+  "object_name": "Cardboard Box",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Rough low-poly scan of an opened box with contents visible inside and broken/holey mesh; the 'opening' component partly describes scan holes as functional gaps, though a real top opening exists."
+ },
+ {
+  "object_id": "d78c1313012b447f9675acedfed663f5",
+  "object_name": "Chair",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Solid monobloc chair form (seat plus slanted backrest, no legs); the listed side groove and circular indentations are visible on the geometry."
+ },
+ {
+  "object_id": "13f8efc17d85464e8ab590de27620ded",
+  "object_name": "Ring Box",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "41f3f411c9a245aaa5ff2ed8fae0f6ad",
+  "object_name": "Wall Clock",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Gold sunburst wall clock — a functional device (battery compartment visible on the back hub) but strongly decor-adjacent wall-mounted item whose only bimanual task is installation/mounting; listed body and sunburst rays are visible."
+ },
+ {
+  "object_id": "d69d6d1475ad4fcf95d6f1185796987b",
+  "object_name": "Toilet",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Tankless toilet — a normally fixed plumbing fixture (bimanual task is install-time only), though person-scale and movable with an operable seat lid whose parting seam and rim are visible as listed."
+ },
+ {
+  "object_id": "692261e01abf453aafe3b376cf017de9",
+  "object_name": "ATM (Automated Teller Machine)",
+  "label": "junk",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "Views show a tall narrow white wall-column/bracket assembly with screw holes and small slots — unrecognizable as an ATM and not an object people pick up and use (an actual ATM would be a large fixed machine anyway); components are generic surface labels ('front panel can be touched', 'bottom base') rather than operable parts."
+ },
+ {
+  "object_id": "91cc6361837249a8b5e265e220fd002b",
+  "object_name": "Stone Bench",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "69a286201b5c40c685b245b762d0b76a",
+  "object_name": "Tray",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "Underside view shows the center is a through-hole - the object is an octagonal ring/donut, not a tray; the 'recessed center can hold items' component is contradicted by the open hole, and the geometry only weakly reads as a functional object (trivet at best)."
+ },
+ {
+  "object_id": "2005d15daca8424c9050955716af2fa5",
+  "object_name": "Bucket",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "b5f82f17c78c4e9598265fe771a11238",
+  "object_name": "Toilet",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Geometry is a plain closed gray cylinder with a small black pipe on top and a black box on the side (water-heater/tank-like), not a toilet; keep rests solely on generic two-hand carry of an otherwise featureless cylinder. The two listed protrusions are visible."
+ },
+ {
+  "object_id": "4cdc6286c4824464a0c6f544969f1f09",
+  "object_name": "Wooden Post",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Plain tapered solid wood block (post/furniture leg); keep is valid under the contract's plain-box two-hand-carry allowance, body-only components fit the featureless geometry."
+ },
+ {
+  "object_id": "263b1c7177d440aeb9400a05a15fe59e",
+  "object_name": "Sponge",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Both views show an intricate rigid coral-like lattice (reef/decor scan) rather than a usable cleaning sponge; the 'squeeze out water' task assumes softness the geometry does not evidence."
+ },
+ {
+  "object_id": "fffdfc4c792541ed8a0c8646979d18dd",
+  "object_name": "Bench",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Object is actually a lidded barrel/canister container (name 'Bench' is wrong), but keep is valid on geometry; lid seam and rims are visible, though the 'middle rim' band sits nearer the bottom than the middle."
+ },
+ {
+  "object_id": "938491df5a2c4313980a69e3dbc5efeb",
+  "object_name": "Plate",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Thin flat disc with teal underside, plate-like; two-hand stabilize/wash task is defensible under the contract."
+ },
+ {
+  "object_id": "532b02858c67410f9a1973544f25dcc4",
+  "object_name": "Traffic Cone",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Geometry is a tall slender bollard/delineator post with red reflective bands, not a cone; such posts are often ground-anchored street fixtures, so the 'lift and reposition' keep rationale is shaky though not impossible."
+ },
+ {
+  "object_id": "4ce3136530704816ac4442a34943e455",
+  "object_name": "Jug",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "6ef697a2aa5e4c1497849195ca59198b",
+  "object_name": "Sneakers",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Single sneaker with laces, opening, and sole all visible; minor nit - the sole's interaction text describes ground traction rather than a hand manipulation."
+ },
+ {
+  "object_id": "da03c0b234964704bbc0db76ab436f49",
+  "object_name": "Chocolate Bar Packaging",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Thin but genuinely box-shaped printed chocolate package (edges show real thickness), so it is a product box rather than a flat graphic panel; hold-and-tear-open is a valid coordinated bimanual task."
+ },
+ {
+  "object_id": "0a6d7460e3124ac09d89c8e8e7a304ad",
+  "object_name": "Limeade Beverage Container",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "9fedf37917f047d19a41e69904a18aac",
+  "object_name": "Storage Box",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "The white geometry reads as an open-top desk organizer with wavy divider tops (visible in the rear view); the claimed 'left drawer with recessed finger grip' is not visible on any face, and the 'right compartment lid' is supported only by a faint top seam."
+ },
+ {
+  "object_id": "50be4f8b8f744730878916aa38b0f08f",
+  "object_name": "Serving Tray",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "19e5c19d811b4dfa95dcec728d3ed8c2",
+  "object_name": "Candleholder",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "A white pillar candle with wick sits in the holder and is central to the example task (placing/removing the candle), yet the candle is not listed as a component - a missed obvious manipulable part; listed body/rim/base are visible."
+ },
+ {
+  "object_id": "833fe96995f0498b82aeef2742fd7cfb",
+  "object_name": "Side Table",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Geometry is a small cup/vase-like cylinder on a disc base rather than an obvious side table, but it is a functional carryable object either way; the V-notch on the top edge is clearly visible."
+ },
+ {
+  "object_id": "360381585edd4e80b81a33fe2cceef15",
+  "object_name": "Watermelon",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Watermelon texture and seam lines are visible so keep and components are grounded, but the mesh is an extremely noisy spiky scan; 'seams' as a grip point is marginal."
+ },
+ {
+  "object_id": "73f80ae78964472bbda19328b354fa35",
+  "object_name": "Trash Can / Garbage Bin",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "99ea0a3c5f1c4b31a9a208e99247a733",
+  "object_name": "Fishing Rod",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Rod with textured grip section is visible and components match; minor nit - the example task references a reel that is not present on the geometry."
+ },
+ {
+  "object_id": "75a0e645e4874deb9dc8f30544a02b52",
+  "object_name": "Teapot",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "1a843497d5f841e1a542fda16c95847f",
+  "object_name": "PVC Pipe Elbow",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Open ribbed socket, external threaded section, and flared base are all visible; hold-while-threading is a genuine coordinated two-hand task despite the small size."
+ },
+ {
+  "object_id": "0eb67d0dfbaf4ad29f06ef9a8cddbea6",
+  "object_name": "Plate",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "7961ab35937046e69b6820a018b03118",
+  "object_name": "Handball",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Vintage leather handball; the small air-valve opening claimed in components is visible in the top view."
+ },
+ {
+  "object_id": "c58510c7fec1491484834879227c8f68",
+  "object_name": "Soccer Ball",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "Top view shows THREE separate balls (two white, one orange) in a row - a multi-object set, not one ball; the single 'body: entire spherical surface' component mismatches the scene, and per-ball the object is a standard two-hand pickup at best."
+ },
+ {
+  "object_id": "8bcd7c05198747b282baeca6e6228df6",
+  "object_name": "Pot",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Decorated ceramic vessel with tapered spout and bridge; top view confirms two openings and the bridge plate, so handle/spout components are grounded."
+ },
+ {
+  "object_id": "9d5c8b04dac0462d90e2ea4c99aeae0d",
+  "object_name": "Adjustable Wrench",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "b95645d1d8f04ed086dc4622b1cebf7b",
+  "object_name": "Speaker",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Geometry is a featureless flat rounded white slab with rectangular mounting blocks on the back (wall/ceiling-panel-like), no speaker features visible; keep rests solely on two-hand carry of a panel."
+ },
+ {
+  "object_id": "1a6ed69e662e4962afc15001566b13f0",
+  "object_name": "Apple",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Stem clearly visible; hold-and-slice is an in-scope fingertip-bimanual task. A tiny decorative ladybug on the surface is correctly not listed as a component."
+ },
+ {
+  "object_id": "cca9920784ab42009dbf792e7b1a9409",
+  "object_name": "Shower Head",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Nozzle ring, connection stem, and spray-nozzle bumps all visible on the renders."
+ },
+ {
+  "object_id": "d298dbdce2884ea49516b50d0595a30e",
+  "object_name": "Pumpkin",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Voxel/Minecraft-style pumpkin with jack-o-lantern face patches on one side; stylized but still a carryable pumpkin volume with a visible stem cube, so two-hand carry holds."
+ },
+ {
+  "object_id": "5ece83c92baf4cdf8d8383bacd9fc116",
+  "object_name": "Lantern",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Minor: the top carry feature is a curved hook spike, not a 'loop' as the handle text says; no latch is visible despite the example task mentioning one."
+ },
+ {
+  "object_id": "31c5f194ffe7427aa8ec592ab04eb0af",
+  "object_name": "Vending Machine",
+  "label": "junk",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "Renders show a thin extruded pixel-art sprite: a flat blue slab with a blank back and tiny voxel blobs on the front face — a flat graphic panel, and a vending machine is a fixed structure anyway; the 9 'dispenser levers' are pixel decals, and the example task ('two hands stabilize while one hand operates') requires three hands."
+ },
+ {
+  "object_id": "6cef46fc5672443185c5f9b46d8d7fa4",
+  "object_name": "Beer Bottle",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Cap confirmed in top-down view; stabilize-plus-open is a realistic bimanual task."
+ },
+ {
+  "object_id": "255b21acfece4aaca8b99b7198a46dcf",
+  "object_name": "Baseball Bat",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Knob, handle taper, and barrel all visible; two-hand swing is the canonical bimanual task."
+ },
+ {
+  "object_id": "1b87d3fce9fe44b7a5f777893569e3a6",
+  "object_name": "Ball",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Underside view confirms the large recessed cavity, so the 'underside cavity' component is grounded, not hallucinated; hollow faceted shell still affords a two-hand hold."
+ },
+ {
+  "object_id": "d8b694a3be5a4ba9a029d6de9032f3f6",
+  "object_name": "Liquid Dispenser",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Pump head, nozzle, and collar step all visible on the black pump bottle."
+ },
+ {
+  "object_id": "e7982e3935a74110bd7e94c70812840c",
+  "object_name": "Bamboo Flute",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Renders show a plain segmented bamboo pole with no visible finger holes or embouchure; the filter's flute-playing task invents holes from the name, leaving two-hand holding of a pole as the only geometry-grounded bimanual task. Components wisely avoid finger holes, though 'top opening' is unverifiable from the renders."
+ },
+ {
+  "object_id": "692ed731a9fa4e709e9a6e5f11629fba",
+  "object_name": "Pillow",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Thin soft cushion slab; body-only component list is appropriate for a featureless pillow."
+ },
+ {
+  "object_id": "cb68743a972c4096b053cff7508fbc5c",
+  "object_name": "Amplifier",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Minor: the round jacks/knobs sit on the top control strip (per top-down view), not the 'front panel' as the input-jacks text claims; the parts themselves exist."
+ },
+ {
+  "object_id": "5b93bc187de8461f87442b4c617d911b",
+  "object_name": "Mug",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Handle, rim, and opening all visible; handle has an odd double-curve mesh shape but is clearly a handle."
+ },
+ {
+  "object_id": "87a26c4045f641789da22b29bfed1bf6",
+  "object_name": "Ultimate Frisbee Disc",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Geometry is a thin flat disc with through-cut crescent slots and a center hole (flying-ring-like), not an ultimate disc with a deep rim; the 'inner ring gap' is a through-cutout rather than a recessed channel and the outer rim is barely raised, so the keep leans on a generic throw/catch reading."
+ },
+ {
+  "object_id": "242a86d4424545958c9c7323406991e1",
+  "object_name": "Bowl",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Photogrammetry-scanned pedestal bowl but fully functional geometry: open cavity, rim, and flared base all confirmed."
+ },
+ {
+  "object_id": "70e9cc54d1524831a8d419d51f03ec93",
+  "object_name": "Pendant Light",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Shade, cord, and ceiling canopy all visible; hold-shade-while-changing-bulb is a realistic bimanual task for a small movable fixture."
+ },
+ {
+  "object_id": "e1d8a93fad5e46a9a0760e5437dca0c7",
+  "object_name": "Cup",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "issues",
+  "notes": "Underside view shows the vessel is open at BOTH ends (large through-hole), so it cannot hold liquid — more a lampshade/sleeve than a cup; the 'base: bottom surface can be pressed' component contradicts the open underside and the pour-liquid example task is impossible. Two-hand carry of the shell is the only defensible task."
+ },
+ {
+  "object_id": "18bd6dc678bb4b63b152908e6b6ed8c3",
+  "object_name": "Bracket",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Mounting ear holes and semi-cylindrical saddle channel confirmed in the renders; hold-in-place-while-fastening is a genuine coordinated two-hand task."
+ },
+ {
+  "object_id": "7bc924951d5d40f397df9ac40607909b",
+  "object_name": "Barrel",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Oil-drum geometry with rolled top/bottom rims; the top-down view confirms the circular bung plug on the lid."
+ },
+ {
+  "object_id": "be64a35c111b4fd4af309658e4f6de53",
+  "object_name": "Picture Frame",
+  "label": "borderline",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Face-on view shows a solid flat wooden plank panel with no frame border, opening, or picture — geometrically a plaque/flat panel, exactly the contract's flat-slab reject case; the body-only component list does accurately match the slab."
+ },
+ {
+  "object_id": "2e998196eaf64549b84cf8e940043316",
+  "object_name": "Noise-canceling Headphones",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Headband and purple padded earcups clearly visible; two-hand don/adjust is realistic."
+ },
+ {
+  "object_id": "be473fda4478420a903ef6770b774c80",
+  "object_name": "Teapot",
+  "label": "ok",
+  "stratum": "kept_random",
+  "components_verdict": "ok",
+  "notes": "Stylized green teapot with feet and an extra trunk-like front protrusion not listed as a component, but the listed handle, gooseneck spout, and lid knob are all visible and operable."
+ },
+ {
+  "object_id": "748c84edd0bf431ab68856e7f60d54af",
+  "object_name": "Star-shaped paper lantern",
+  "label": "borderline",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Views show a folded 3D five-pointed star with photo-collage paper texture; reads as a hanging star decoration (decor reject) as much as an assemblable paper lantern, so the two-hand assembly task is defensible but decorative-ornament is equally so."
+ },
+ {
+  "object_id": "298dff4d018c44e8af3d7209bdd36159",
+  "object_name": "Chessboard",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Flat checkered board, but a game board is functional equipment genuinely moved with two hands; body-only is right since it has no other parts."
+ },
+ {
+  "object_id": "d3e8264a68d544b2888528ee2ba2062d",
+  "object_name": "Baseball",
+  "label": "borderline",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "A standard palm-size baseball is the canonical tiny one-hand object; the only bimanual hook is a two-hand catch, which is real but thin."
+ },
+ {
+  "object_id": "66efdeab7d214907b32bbcb47d9b55ad",
+  "object_name": "Ice Block",
+  "label": "borderline",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Stylized irregular blue chunk that looks like a game rock/ice asset rather than an everyday manipulable; two-hand lift of a heavy ice block is defensible if the implied scale is large."
+ },
+ {
+  "object_id": "0360dcad4c5e4d55a3d618f6f5b14cb7",
+  "object_name": "Table",
+  "label": "borderline",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Geometry is only a thin featureless gray slab with no legs - a bare panel, not a table; two-hand carry of a board is defensible but it sits right on the flat-panel reject boundary."
+ },
+ {
+  "object_id": "8d3cedfccaa4407fb95743248f64f7ff",
+  "object_name": "Block",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Plain rectangular wooden block; contract explicitly blesses a plain box/block kept for two-hand carry."
+ },
+ {
+  "object_id": "1b38000c91a84592928406a9a3b08377",
+  "object_name": "Trading Card Protector",
+  "label": "borderline",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Both sampled views show only an edge-on sliver of a thin featureless panel; consistent with a real card sleeve (whose two-hand card-insertion task is fingertip-bimanual, in scope), but the object is card-sized and the geometry alone could equally be a blank panel."
+ },
+ {
+  "object_id": "da79ca8a87b94ba092c2c82398d9ce71",
+  "object_name": "Ball of crumpled paper",
+  "label": "junk",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "A crumpled paper wad is a fist-sized one-hand waste item, not a functional object; no meaningful coordinated two-hand task exists."
+ },
+ {
+  "object_id": "ae6ab3e0615b493e8a3a14cc30829e8c",
+  "object_name": "Mouse",
+  "label": "junk",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Geometry is a small toy boat hull with 'NOAH'S ARK' embossed on the side (flat deck strip on top), not a computer mouse; a palm-size toy hull with a generic pick-up-and-move task has no realistic bimanual use."
+ },
+ {
+  "object_id": "b3ebd66c4c324363ae8b803145c60067",
+  "object_name": "Heart-shaped Pillow",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Plump pink heart cushion; placing/hugging/fluffing with two hands is a genuine bimanual task."
+ },
+ {
+  "object_id": "5b1520c74eac4d6c9a0687552f5e578c",
+  "object_name": "Hay Bale",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Real photogrammetry hay bale, legitimate two-hand lift; note the scan includes a slab of surrounding ground/floor fused into the mesh."
+ },
+ {
+  "object_id": "5472ca15175042ebb0a19f724c2855ac",
+  "object_name": "Beanbag",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Flattened round green cushion/pouf; two-hand lift and reposition is realistic."
+ },
+ {
+  "object_id": "a2bb5388c255454d9eaab4365d7e3663",
+  "object_name": "Cheese Block",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Large stylized cheese cube (very low-res texture); stabilize-while-slicing and two-hand carry of a big block are realistic kitchen tasks."
+ },
+ {
+  "object_id": "273bbeb9f3134e9781687f45a2f5a97f",
+  "object_name": "Pillow",
+  "label": "borderline",
+  "stratum": "kept_single_body",
+  "components_verdict": "issues",
+  "notes": "Geometry is a thin serrated leaf-shaped ornament with a pointed tip, hanger-like stem, and gray damask pattern - a decorative leaf, not a pillow; the 'entire soft structure' interaction text contradicts the rigid spiky form."
+ },
+ {
+  "object_id": "3618846757a14c3ab0412274240d67ed",
+  "object_name": "Ball",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Low-poly sky-blue sphere reading as a generic play ball of ambiguous (plausibly large) size; two-hand catching/tossing is a genuine bimanual task."
+ },
+ {
+  "object_id": "a557b1bd238245f5a626ec8334624d88",
+  "object_name": "Foam Mattress",
+  "label": "junk",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Mesh is a near-zero-thickness sheet (both sampled orbit views are hairline slivers) whose face is B4 certificate-frame retail packaging ('B4 賞状額' print) - a flat printed panel mislabeled as a mattress, with no graspable volume."
+ },
+ {
+  "object_id": "3b1ce78feb744456998034fe4fa8e6b7",
+  "object_name": "Wooden Frame",
+  "label": "borderline",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Solid dark plank-textured panel with no frame opening - a wall panel/board rather than a frame; two-hand carry of a board is defensible but it borders the flat-panel/wall-art reject class (interaction even says 'hang')."
+ },
+ {
+  "object_id": "fba2f62645904351bf7378b7c58893db",
+  "object_name": "Reception Desk",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Featureless white massing blocks (counter block plus curved back panel) but the form clearly reads as a desk/counter; movable furniture pushed/lifted with both hands satisfies the contract."
+ },
+ {
+  "object_id": "ba4e2d8dd4b84a3eb50bc404431b3c2d",
+  "object_name": "Chair",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Crude untextured solid massing (slanted back plus seat cube) rather than a detailed chair, but it is a volumetric carryable furniture form, not a panel/decor item; two-hand lift is valid."
+ },
+ {
+  "object_id": "cb80ef1eceba416ab5307f6ab44c189c",
+  "object_name": "L-shaped shelf",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "White primitive L/C-shaped shelf-bracket structure with legs; crude but consistent with a small movable shelf unit carried two-handed."
+ },
+ {
+  "object_id": "b3aa650ea33f446fbc21ae9fcc38c052",
+  "object_name": "Globe",
+  "label": "borderline",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Bare dark mottled stone-textured sphere with no stand, axis, or map - reads as a decorative sphere; the filter's example task even references rotating 'the base or axis' that does not exist in the geometry, and only a generic two-hand hold of a large ball remains defensible."
+ },
+ {
+  "object_id": "7f5f5faf6f914f0ea7f0cb555273a147",
+  "object_name": "Bed",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Geometry is a plain white mattress-like slab with real thickness (no frame/headboard); mattresses genuinely are plain slabs and two-hand lifting/repositioning one is a classic bimanual task."
+ },
+ {
+  "object_id": "656686eefdd14d0c9bb65eb41a0a7638",
+  "object_name": "Frame",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Open white cube frame reading as a display-cube/side-table frame; frame members afford natural two-hand gripping for carry, though the model is an untextured primitive."
+ },
+ {
+  "object_id": "e8b02dac4de04f20aa8322a42a41c449",
+  "object_name": "Crate",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Classic closed wooden crate ('Crate Inc.' game-style texture); two-hand carry is exactly the contract's blessed case; no lid or handle visible so body-only is right."
+ },
+ {
+  "object_id": "4dfe3f59425d43399bd05bab9a4055c3",
+  "object_name": "Bench",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Featureless white solid with a clear seat-plus-backrest step massing; contract explicitly endorses a bench kept for two-hand carry, though the model is an untextured primitive."
+ },
+ {
+  "object_id": "4b143f04eb6846dd81daf72ff9e1cb43",
+  "object_name": "Panel",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Rotated view shows a real PRODEX ALUMINIO insulation panel with visible thickness; two-hand carry is genuine, body-only is right."
+ },
+ {
+  "object_id": "f44d8dcf556147b9ae527b41e9042097",
+  "object_name": "Chair",
+  "label": "junk",
+  "stratum": "kept_single_body",
+  "components_verdict": "issues",
+  "notes": "All views show a jumble of disconnected white blocky slabs floating apart — no seat, legs, or back; abstract/corrupt geometry, and the component text 'moved as a single unit' contradicts the disconnected pieces."
+ },
+ {
+  "object_id": "fcbde6bb06bd41b2a84e89f2ee94dd39",
+  "object_name": "Cement Bag",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "606918cf45504660a3457c38573b9a1e",
+  "object_name": "Tile",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Interlocking puzzle-edge floor mat tile; two-hand positioning during installation is realistic."
+ },
+ {
+  "object_id": "3772fa5203f9460d99ba8929315535df",
+  "object_name": "Digital Frame",
+  "label": "borderline",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Geometry is a plain dark wood-plank board (no screen or bezel), not a digital frame; a bare flat plank is defensible only under the two-hand panel-carry precedent."
+ },
+ {
+  "object_id": "de80c61a93834d1a81ce62632cb4abf0",
+  "object_name": "Wall-mounted TV",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Featureless white flat slab with a mount block on the back — consistent with a TV panel; two-hand carry genuine."
+ },
+ {
+  "object_id": "71dc67bf4c7f4d14a596edf92d31eca0",
+  "object_name": "Egg",
+  "label": "junk",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Views show a decorative blue mottled glass sphere (marble/paperweight), not an egg — a tiny one-hand decorative object; the 'cracking/peeling' task is nonsense for this geometry."
+ },
+ {
+  "object_id": "a03653fec0de46999c587146589cef63",
+  "object_name": "Cheese Wedge",
+  "label": "borderline",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Geometry is a white lattice-porous rectangular block that reads as a sponge or trabecular-scan rather than a cheese wedge; if cheese the stabilize-while-slicing task holds, if sponge/scan it should have been rejected."
+ },
+ {
+  "object_id": "71174c56c9a641f6b21cf59edffad3f3",
+  "object_name": "Soccer Ball",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "7966e458f4484c8da8ead32d33b25969",
+  "object_name": "Ball",
+  "label": "borderline",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "All views show a featureless brown dome with a flat bottom (hemisphere), not a full ball; component text says 'entire spherical surface' which slightly mismatches; two-hand catch defensible only if it really is a ball."
+ },
+ {
+  "object_id": "d98cfff633bc476698d384795603fd0a",
+  "object_name": "Rocking Chair",
+  "label": "junk",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Views show an abstract low-poly white blob with a rectangular recess — no rockers, seat, legs, or backrest anywhere; not a chair, an abstract shape."
+ },
+ {
+  "object_id": "aab53ae1790945b9b4960b77c44712be",
+  "object_name": "Braided Bracelet",
+  "label": "borderline",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Continuous braided bangle with no clasp visible, so the 'fastening the clasp' task is invented; small jewelry is near the one-hand line, though two-hand adjust/don is defensible under the fingertip-bimanual scope."
+ },
+ {
+  "object_id": "1fc7e01a2f414b1e90749e121d9b9750",
+  "object_name": "Cylinder",
+  "label": "borderline",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Featureless white rounded puck/slab primitive with no lid, seam, or container cue; 'heavy canister' is inferred from nothing — close to the abstract-shape reject category."
+ },
+ {
+  "object_id": "86c6273c777e4686a86e1bbd068d9522",
+  "object_name": "Bread",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Round orange-brown slice (toast-like); the recorded 'two hands to pick up a slice' task is fake-bimanual, but two-hand tearing keeps it in scope under the fingertip-bimanual precedent."
+ },
+ {
+  "object_id": "43df58eacb8e44a7bfa951da9ea0fe73",
+  "object_name": "Column",
+  "label": "borderline",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Plain white cylinder with stepped ends — a structural column segment/primitive; leans toward the fixed-structure/abstract reject side, though a heavy two-person pillar-section lift is arguable."
+ },
+ {
+  "object_id": "376cbbc7b0a643068aa34e43becb013a",
+  "object_name": "Stool",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Cluster of black hexagonal prisms forming a hex stool/side table; movable furniture, two-hand carry genuine."
+ },
+ {
+  "object_id": "329afef5adb94db3916ae981f24ce61a",
+  "object_name": "Easter Eggs and Balls",
+  "label": "junk",
+  "stratum": "kept_single_body",
+  "components_verdict": "issues",
+  "notes": "It is a multi-object decorative scene — several patterned Easter eggs plus a wrapped gift bag sitting on a blue mat — not a single manipulable object; a single 'body' component over disconnected items is nonsense."
+ },
+ {
+  "object_id": "8b2eddb093744bb892db3aadde2ca4e4",
+  "object_name": "Speaker",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Cylindrical canister with molded collar — plausible smart speaker or filter cartridge; either way a functional product with a legitimate two-hand carry, body-only fine."
+ },
+ {
+  "object_id": "90c9778e68e54a84be1a9ad773d71d8b",
+  "object_name": "Suit",
+  "label": "borderline",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Garment rendered rigid on an invisible mannequin (stand disc visible in top-down) with odd marble-like texture; folding/carrying clothes is bimanual, but the geometry is a hollow display shell rather than a foldable garment."
+ },
+ {
+  "object_id": "78a75d39e9814615bfdd32b815d1ada0",
+  "object_name": "Stick",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Long gnarled staff-like stick; two-hand staff/tool use is genuine."
+ },
+ {
+  "object_id": "c84331cb8e424eeda5472c87a0f6cf4c",
+  "object_name": "Trading Card",
+  "label": "borderline",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Thin flat graded-card slab — geometrically adjacent to the plaque/flat-panel reject class and a one-hand object; only the fingertip-bimanual sleeve/case insertion keeps it arguable."
+ },
+ {
+  "object_id": "b5458c867ee24a57a8d767175ce3aa5e",
+  "object_name": "Hammock",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Geometry is a flat lace/mesh patterned textile sheet (looks more like a lace cloth than a hammock — no ropes or gathered ends), but spreading a fabric sheet is genuinely two-handed either way."
+ },
+ {
+  "object_id": "e7e39b18ce66412fab7a325f7ca47fb1",
+  "object_name": "Chicken Wing",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Photogrammetry-style breaded fried-chicken piece (texture could also pass for a rock scan); hold-and-tear two-hand eating is in scope per the fingertip-bimanual precedent."
+ },
+ {
+  "object_id": "663bd45da96b4e0b8113389cb01125ad",
+  "object_name": "Wooden Box/Crate",
+  "label": "ok",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "Framed wooden crate with recessed panels; no lid or handles visible so body-only is right."
+ },
+ {
+  "object_id": "86da18414f46454ba4b047b0e788d903",
+  "object_name": "Chair",
+  "label": "junk",
+  "stratum": "kept_single_body",
+  "components_verdict": "ok",
+  "notes": "All views show two huge featureless offset flat slabs (one with an angled cut) — no legs, seat, or backrest; abstract slab geometry, not a chair."
+ },
+ {
+  "object_id": "b854aaf58f174598846597c6797cb28c",
+  "object_name": "Axe",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "34096d6f1cdd4ec0a752568b5d62a23a",
+  "object_name": "Toilet",
+  "label": "borderline",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Geometry is a featureless solid cylinder with a coaxial stub, nothing toilet-like; defensible only as a generic drum/roller for two-hand carry."
+ },
+ {
+  "object_id": "a52e8a1fbe0d4c9f9aa5d0c84655d404",
+  "object_name": "Toilet Paper Roll",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "8950a553cd9b46b8b5ff5e9bc49746e2",
+  "object_name": "Axe",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Head is a hexagonal maul/hammer block rather than an axe blade, but it is still a valid long-handled two-hand swing tool."
+ },
+ {
+  "object_id": "4d718cf277c8492a913e1c115c90f404",
+  "object_name": "Cube",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Plain featureless cube; contract explicitly allows plain-box two-hand carry, and body-only components match the geometry."
+ },
+ {
+  "object_id": "26ef67722efe4dab920df04f1c8113d6",
+  "object_name": "Toilet",
+  "label": "borderline",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Abstract blocky white massing with a recessed notch and slot legs, not recognizable as a toilet; keep rests solely on two-hand carry of a large block (the recessed opening component is at least visible)."
+ },
+ {
+  "object_id": "f7b7365028ce4cd1b8711027f274feeb",
+  "object_name": "Toilet Seat",
+  "label": "borderline",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Geometry is a flanged rectangular insert with a black recessed box and a red rod standing inside, not a toilet seat; a container-like two-hand carry is defensible and both listed parts (red cylinder, rim) are visible."
+ },
+ {
+  "object_id": "bca7309b2b764a9b908c74259f081432",
+  "object_name": "Axe",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "bae99a8a83b441618cbd6f0c5c79a579",
+  "object_name": "Rifle",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Scoped bolt rifle with visible scope, wooden stock, and barrel; weapons are not in the contract's reject list and rifle handling is inherently two-handed; bolt handle is too small to confirm at render size but plausible on this detailed model."
+ },
+ {
+  "object_id": "af953b27699c4bfd8a249c9dfe720e47",
+  "object_name": "Knife",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Top view shows the blade is a garden-trowel scoop rather than a knife blade; the interaction text already covers digging, so components still match the visible geometry."
+ },
+ {
+  "object_id": "03ece2c6257f46c6a92ea938471d0b30",
+  "object_name": "Knife",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "2953d3f27457418c9604b1b0a93d7c90",
+  "object_name": "Toilet seat",
+  "label": "borderline",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Cartoon-styled rounded red pad with a yellow knob, no seat hole; reads as a stylized cushion/lid rather than a toilet seat, though a two-hand lift of the wide pad is defensible and both parts are visible."
+ },
+ {
+  "object_id": "47f87b5fb1494ea5a9d7d265186f72f8",
+  "object_name": "Toilet Bowl",
+  "label": "junk",
+  "stratum": "kept_suspicious",
+  "components_verdict": "issues",
+  "notes": "Lumpy partial 3D-scan fragment with an amorphous blob underside, not recognizable functional geometry (contract rejects 3D scans/abstract shapes); the claimed rim/base are not sensibly grounded on the broken mesh."
+ },
+ {
+  "object_id": "206f69c16f7b4b0f8fbf1a6757b2d52b",
+  "object_name": "Knife",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "ad03f8c3e7724d9b82d9c50297440e38",
+  "object_name": "Knife",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Blade is a thin spike (letter-opener/awl-like) rather than a slicing edge, but handle and blade are both clearly visible."
+ },
+ {
+  "object_id": "69cac12c6a5c4a73ba1ef135e09e751e",
+  "object_name": "Toilet",
+  "label": "borderline",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Featureless L-shaped primitive (vertical slab on a box base), nothing toilet-like; keep rests only on generic two-hand carry of a large block, and body-only components fit the featureless geometry."
+ },
+ {
+  "object_id": "beb5a825e7b547868b979155ab78ed3f",
+  "object_name": "Motorcycle Helmet",
+  "label": "borderline",
+  "stratum": "kept_suspicious",
+  "components_verdict": "issues",
+  "notes": "Hollow faceted dome mounted on a rigid flared trunk-like stand (could equally be a low-poly tree); the helmet-carry keep is defensible, but no chin strap exists in any view — that component is hallucinated."
+ },
+ {
+  "object_id": "5258df15e69841bfad85d14bd530dcf0",
+  "object_name": "Handgun",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Blocky pistol with visible grip, trigger, and trigger guard; weapons are not in the contract's reject list and the slide/magazine maintenance task is genuinely two-handed."
+ },
+ {
+  "object_id": "d75965a9183345658c0b850c0d6b61ef",
+  "object_name": "Toilet Paper Holder",
+  "label": "junk",
+  "stratum": "kept_suspicious",
+  "components_verdict": "issues",
+  "notes": "Smooth pink organic blob with a small blue stub, resembling a cartoon popsicle; no holder geometry, no roll, no realistic bimanual task, and the 'blue protrusion as handle/lever' interaction is nonsense on this blob."
+ },
+ {
+  "object_id": "4360112ce6854d1cad869ffe42ad5fe5",
+  "object_name": "Cube",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Large box with two vertical protruding strips on one face matching the listed side handles; two-hand carry keep is contract-correct."
+ },
+ {
+  "object_id": "e5c0da2fa6134c9aa9af19ce4adfe15f",
+  "object_name": "Cube Table",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Solid wood-textured cube block; movable-furniture/box two-hand carry is contract-correct and body-only components fit."
+ },
+ {
+  "object_id": "a0dff6211a614d059a8b09caaf5bdfe5",
+  "object_name": "Knife",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "080147c5465d407f88dd2e4adce2c6c0",
+  "object_name": "Toilet",
+  "label": "borderline",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Actually an ornately carved relief palette/inkstone (dragon/cloud carving) with a separate long brush fused across it; palette-plus-brush use is functional and bimanual, but it is a decorative-relief composite of two merged objects, not a toilet."
+ },
+ {
+  "object_id": "b0e22e0a1956446e9554ac0ac5ea20f6",
+  "object_name": "Cube",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Game-crate style texture on a plain cube, but geometry is a box so the two-hand carry keep is contract-correct."
+ },
+ {
+  "object_id": "58459e6e148a400587fb5d36f788a58e",
+  "object_name": "Shotgun",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": ""
+ },
+ {
+  "object_id": "733b802f5a4743ef99ad574279d49920",
+  "object_name": "Cube",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Featureless olive cube, but the contract explicitly blesses a plain box kept for two-hand carry; body-only component is legitimate."
+ },
+ {
+  "object_id": "bb332975a89e4b2ebffd7a952eca35e4",
+  "object_name": "Toilet Seat",
+  "label": "junk",
+  "stratum": "kept_suspicious",
+  "components_verdict": "issues",
+  "notes": "Views show an amorphous lumpy slab (tall blob from the side, lens-shaped disc top-down) with no seat ring, hole, or hinge - a formless scan blob, not a functional toilet seat; the 'rim' grip component is a generic edge on a shapeless blob and the hinge-removal task has no hinges to act on."
+ },
+ {
+  "object_id": "fcd7dc1f0fdc4eb7bb9fa47f40971e91",
+  "object_name": "Cube",
+  "label": "borderline",
+  "stratum": "kept_suspicious",
+  "components_verdict": "issues",
+  "notes": "Geometry is a plain cube with a faceted polyhedral ball fused to one side - an abstract primitive composition, not a container; the 'protruding attachment ... used as a handle' reads a handle function into a decorative faceted lump, and the pouring/emptying task has no opening to pour from."
+ },
+ {
+  "object_id": "caf30703c27c427da73cd87e37474da8",
+  "object_name": "Toilet Paper Holder",
+  "label": "borderline",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Views show a flat wall-mount back plate with four cylindrical pegs and no roller arm; it is real functional hardware and the mounting posts are visible, but its only manipulation is a one-time installation, so keeping it is defensible either way."
+ },
+ {
+  "object_id": "6a110aad61524d85b5a50ce419c22871",
+  "object_name": "Stone Block",
+  "label": "borderline",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "A photogrammetry-scanned natural rock block with a small slot cut in the top; two-hand carry of a heavy block is genuine, but a raw stone is not an everyday functional object people use, so condition 1 is arguable; the recessed slot component is visible."
+ },
+ {
+  "object_id": "651d816a83464a689e4b5fb443ef9f21",
+  "object_name": "Jigsaw Puzzle Cube",
+  "label": "borderline",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Views show an intricate fractal-maze cube split into two interlocking halves - a real 3D-print puzzle whose two-hand pull-apart is plausible, but it equally reads as abstract fractal art rather than an everyday object."
+ },
+ {
+  "object_id": "b29fb726e66c4e3693253145301e2169",
+  "object_name": "Helmet",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Clear Daft-Punk-style helmet; the side earpiece pods and dark front visor panel listed as components are both visible on the geometry."
+ },
+ {
+  "object_id": "9745ff25ab1c440aae646eb2fea0bcbc",
+  "object_name": "Axe",
+  "label": "junk",
+  "stratum": "kept_suspicious",
+  "components_verdict": "issues",
+  "notes": "The object is a diorama scene - a small axe embedded in a stump on a circular grass mound with a black terrain base; you cannot pick up and swing 'this object', so the chopping task does not fit the geometry, and the 'body' component ('entire axe can be gripped and swung') actually spans the grass terrain."
+ },
+ {
+  "object_id": "412f710239fb45759c1845f19d71a687",
+  "object_name": "Motorcycle Helmet",
+  "label": "borderline",
+  "stratum": "kept_suspicious",
+  "components_verdict": "issues",
+  "notes": "Geometry is a smooth opaque white sphere with a drooping curved chin flap and a crescent slit underneath - plausibly a stylized helmet but with no head cavity clearly modeled; the 'visor: clear/semi-transparent shield' component does not exist on the all-opaque shell."
+ },
+ {
+  "object_id": "6e84ec81a5094abca30198919878fb00",
+  "object_name": "Axe",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Top-down view shows the lens-shaped double-bit head with central eye boss on a slender curved handle - a double-bit axe; handle and blade components match the geometry."
+ },
+ {
+  "object_id": "de18e38c959d43eda319fa57b044313d",
+  "object_name": "Axe",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Yellow-handled splitting axe/maul with dark metal head; the thin broad blade is visible edge-on in the front and top views; components match."
+ },
+ {
+  "object_id": "5845dac0dd6748e09dc424b77007caba",
+  "object_name": "Cube",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Rounded-corner black cube (box/pouf-like); plain box kept for two-hand carry is contract-correct; body-only component fine."
+ },
+ {
+  "object_id": "e15ee7c4145c4036aa818e64151e45cf",
+  "object_name": "Cube",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Open-top box: top-down view shows the square wall rim around an open interior, so the 'rim' component is grounded and the carry task fits."
+ },
+ {
+  "object_id": "37714a616bd44c038484f14757ebabbb",
+  "object_name": "Rifle",
+  "label": "borderline",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "A purple toy-styled sniper rifle; scope, stock, barrel, and trigger region are all visible and two-hand handling is genuine, but a rifle strains 'object people use in everyday life' even though the contract's reject list does not cover weapons."
+ },
+ {
+  "object_id": "d224551a67014397825ea63fdf30abb1",
+  "object_name": "Axe",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Clear axe with textured wooden handle and dark metal head; two-hand chopping is realistic and the handle/blade components match the geometry."
+ },
+ {
+  "object_id": "47065ad563f44b30bde8e02fd2d734ed",
+  "object_name": "Toilet Paper Roll",
+  "label": "borderline",
+  "stratum": "kept_suspicious",
+  "components_verdict": "issues",
+  "notes": "Geometry is a closed cylinder wrapped in a Mrs. Meyer's Clean Day product label with pinched/crumpled ends - a sealed product, not an open roll; the 'central opening / hollow core' component is not visible anywhere, and the object is small enough that the hold-and-tear task is the only bimanual reading."
+ },
+ {
+  "object_id": "4da56e7f67664c5e966320b4e15f6453",
+  "object_name": "Motorcycle Helmet",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Real scanned open-face helmet (white shell with orange bolt); black interior padding and dangling chin-strap pieces listed as components are visible."
+ },
+ {
+  "object_id": "2833d594aa1949b488e8a26815d6014a",
+  "object_name": "Cube",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Dark rectangular block with two square cell openings on the end face (cinder-block-like); heavy two-hand carry is genuine and the 'recessed compartments' component is visible in the 00008 view."
+ },
+ {
+  "object_id": "4ae56ac0728f46e088e1e8c7f94888cf",
+  "object_name": "Toilet",
+  "label": "junk",
+  "stratum": "kept_suspicious",
+  "components_verdict": "issues",
+  "notes": "Views show an amorphous melted-looking lump with wavy sagging edges - no bowl, seat, lid, or tank exists, so the 'lift the seat or lid' task is impossible; the 'top protrusion ... used as a lever' is a tiny spike on a formless blob."
+ },
+ {
+  "object_id": "a3d62736cd7743878fe377488d962086",
+  "object_name": "Toilet",
+  "label": "borderline",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Geometry is a crude L-shaped block with a circular recess in the horizontal surface - marginally readable as a low-poly toilet (or equally a counter with a sink hole); installation lift is a defensible heavy-carry task and the bowl-opening component is visible."
+ },
+ {
+  "object_id": "f0b63b9aa3f44b94a0a620fc257209e4",
+  "object_name": "Helmet",
+  "label": "borderline",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Not helmet-shaped: a rectangular box body with a wide curved strap/handle arching over it (clear in the top-down view); as an unidentified box-with-handle it is still a carryable functional shape, and the listed 'handle' component does exist."
+ },
+ {
+  "object_id": "cccf36acd7f94757858d5185d6626449",
+  "object_name": "Puzzle Cube",
+  "label": "junk",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Geometry is a warped, bent arch draped with a sudoku-grid texture - a corrupted/deformed mesh, not a cube; the example task of rotating segments to solve it is impossible on this abstract shape; the body-only component listing itself is not hallucinated."
+ },
+ {
+  "object_id": "291bf346ef8b42b5914d423f60e9386f",
+  "object_name": "Axe",
+  "label": "ok",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Stylized low-poly hatchet with wooden handle, red binding, and blue-grey blade; two-hand swing is realistic; handle component matches (blade not listed, but a blade is not a hand-operable part)."
+ },
+ {
+  "object_id": "fea0da5470fd44c3a38f28ed6d3a37d9",
+  "object_name": "Stone",
+  "label": "junk",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "A round, lumpy scanned rock roughly hand-sized with surface nodules; it is not a functional everyday object, and 'picking up and moving the stone' is a one-hand task, so neither contract condition clearly holds; the nodule component is at least visible."
+ },
+ {
+  "object_id": "bc26de93fab34960be6ac3d396abbb43",
+  "object_name": "Cube",
+  "label": "borderline",
+  "stratum": "kept_suspicious",
+  "components_verdict": "ok",
+  "notes": "Not a cube: a completely featureless half-cylinder prism (flat back, curved front, D-shaped top-down); the only defense is the plain-heavy-block two-hand-carry clause, but unlike a box it has no everyday-object identity."
+ }
+]
