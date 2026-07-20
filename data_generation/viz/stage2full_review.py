@@ -1,10 +1,17 @@
 #!/usr/bin/env python
-"""stage2_full review v2 — full-fidelity clone of bimanual_grounding_en:
-dark page, white cards with badges + FULL texts, lazy interactive plotly
-(FINAL/raw), and per-role <details> 40-view strips of
-Molmo point overlays (written to views/... like v1's relative tree).
-SAM per-view masks are not stored by the v2 runner; strips note that.
+"""stage2_full review — paged HTML browser for outputs/stage2_full.
+
+Dark page, white cards with badges + FULL texts, lazy interactive plotly
+(FINAL/raw), and per-role <details> 40-view strips of Molmo point overlays
+(written to views/<oid>/<qd>/role{A,B}/, shared by both page orderings).
+SAM per-view masks are not stored by the runner; the strips note that.
+
+The view JPEGs are cached by path only — delete OUTD/views/ after re-running
+stage2 over the same objects, or the overlays stay stale silently.
+
 Run: ~/miniconda3/envs/mm/bin/python stage2full_review.py [start end]
+     start must be a multiple of 100 (page size); default renders [0:100].
+     BYNAME=1 sorts by object_name and emits byname_p*.html + byname_index.html.
 """
 import os, sys, json
 import html as _html
@@ -14,11 +21,70 @@ from PIL import Image, ImageDraw
 DG = "/home/michaellee/mclee/affogato/data_generation"
 ROOT = f"{DG}/outputs/stage2_full"
 OUTD = f"{DG}/outputs/stage2_full_review"
-REF = f"{DG}/outputs/bimanual_grounding_en/index.html"
 PER_PAGE = 100
-THR = 0.15
-UP, HOR = 1, [0, 2]
-A_COL, B_COL = "#F28E2B", "#0ABAB5"
+THR = 0.15                                  # = sra.SUPPORT_THR, "point belongs to the region"
+UP, HOR = 1, [0, 2]                         # = sra.UP_AXIS / sra.HOR_AXES
+A_COL, B_COL, OVL_COL = "#F28E2B", "#0ABAB5", "#d612d6"   # role A / role B / A n B
+
+BASE_CSS = """<style>
+:root{--bg:#0f1216;--card:#fff;--ink:#1a1d23;--muted:#6b7280;--line:#e6e8ec;
+--inter:#2563eb;--intra:#059669;--chip:#f3f4f6;--accent:#7c3aed}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#e6e8ec;
+font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+header{padding:26px 32px 14px}
+header h1{margin:0 0 4px;font-size:22px;font-weight:700}
+header .meta{color:#9aa3af;font-size:13px}
+.legend{display:flex;gap:18px;margin-top:10px;font-size:13px;color:#cbd5e1;flex-wrap:wrap}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:middle}
+.obj{padding:8px 32px 0}
+.obj-head{display:flex;align-items:baseline;gap:10px;margin:22px 0 10px;
+border-top:1px solid #232830;padding-top:18px}
+.obj-head .name{font-size:18px;font-weight:700;color:#fff}
+.obj-head .oid{font:12px ui-monospace,Menlo,Consolas,monospace;color:#6b7280}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(540px,1fr));gap:18px;padding-bottom:8px}
+.card{background:var(--card);color:var(--ink);border-radius:14px;overflow:hidden;
+box-shadow:0 1px 3px rgba(0,0,0,.25),0 12px 28px rgba(0,0,0,.18)}
+.body{padding:15px 17px 6px}
+.qhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.qhead .qidx{color:#9ca3af;font:12px ui-monospace,Menlo,Consolas,monospace}
+.title{font-size:17px;font-weight:700}
+.query{color:var(--muted);font-size:12.5px;margin:4px 0 10px}
+.roles{display:flex;flex-direction:column;gap:5px}
+.role{display:flex;gap:7px;align-items:baseline;font-size:13px;flex-wrap:wrap}
+.role .rid{font-weight:800;width:14px;flex:none}
+.role .verb{font-weight:700}
+.role .at{color:var(--muted)}
+.role .reg{color:#111;background:#f6f8ff;border:1px solid;border-radius:6px;padding:0 6px}
+.role .tgt{color:var(--muted);font-size:11.5px}
+.fn{color:var(--muted);font-style:italic;font-size:12px;margin:1px 0 2px 21px}
+.molmo{font:11.5px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+background:#0f172a;color:#cbd5e1;border-radius:7px;padding:6px 9px;margin:3px 0 6px;word-break:break-word}
+.molmo .pt{color:#38bdf8}
+.cloud{padding:4px 10px 6px;background:#fbfbfc;border-top:1px solid var(--line)}
+.cloud img{width:100%;height:auto;display:block;border-radius:8px}
+.cloud-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;
+font-size:11.5px;color:var(--muted);padding:5px 2px 2px;flex-wrap:wrap}
+.cloud-foot a{color:var(--inter);text-decoration:none;font-weight:600;white-space:nowrap}
+.roledet{border-top:1px solid var(--line)}
+.roledet>summary{cursor:pointer;padding:9px 16px;font-size:13px;font-weight:700;color:#374151;
+border-left:4px solid;list-style:none}
+.roledet>summary::-webkit-details-marker{display:none}
+.roledet>summary:before{content:"▸ ";color:#9ca3af}
+.roledet[open]>summary:before{content:"▾ "}
+.strip-head{font-size:11.5px;color:#374151;font-weight:600;padding:2px 16px 4px;
+border-left:4px solid;margin-left:0}
+.strip-head .hitn{color:var(--muted);font-weight:500}
+.views{display:flex;gap:8px;overflow-x:auto;padding:6px 14px 12px}
+.views figure{margin:0;flex:none;text-align:center}
+.views img{height:132px;width:auto;display:block;border-radius:6px;border:1px solid var(--line);
+background:#fafafa;margin-bottom:3px}
+.views figcaption{font:10px/1.2 ui-monospace,Menlo,Consolas,monospace;color:var(--muted)}
+.badge{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+padding:2px 7px;border-radius:999px;color:#fff}
+.badge.inter{background:var(--inter)}.badge.intra{background:var(--intra)}
+footer{color:#6b7280;text-align:center;padding:26px;font-size:12px}
+</style>"""
 
 LAZY_JS = """
 <script>
@@ -52,7 +118,7 @@ EXTRA_CSS = """<style>
 .vcell{margin:0;text-align:center;flex:0 0 auto}
 .vcell img{height:120px;border-radius:4px;display:block}
 .vcell figcaption{font-size:10px;color:#9ca3af}
-.title,.query,.molmo,.reg{white-space:normal!important;overflow:visible!important;
+.query,.molmo,.reg{white-space:normal!important;overflow:visible!important;
  text-overflow:clip!important}
 .note{font-size:11px;color:#9ca3af;padding:0 8px 6px}
 </style>"""
@@ -62,9 +128,10 @@ def main():
     import plotly.graph_objects as go
     from plotly.offline import get_plotlyjs
     os.makedirs(OUTD, exist_ok=True)
-    ref = open(REF, encoding="utf-8").read()
-    css = ref[ref.index("<style>"): ref.index("</style>") + 8]
-    plotlyjs = "<script>" + get_plotlyjs() + "</script>"
+    # one shared plotly.min.js beside the pages: inlining it cost ~4.8 MB per
+    # page (~1 GB over 210 pages) and defeated browser caching
+    open(f"{OUTD}/plotly.min.js", "w", encoding="utf-8").write(get_plotlyjs())
+    plotlyjs = "<script src=\"plotly.min.js\"></script>"
 
     recs, roots = [], {}
     for part in ("stage1_part0.json", "stage1_part1.json"):
@@ -96,7 +163,7 @@ def main():
         for gi, (r, _) in enumerate(done):
             nm = str(r.get("object_name", "?"))
             if not groups or groups[-1][0] != nm:
-                groups.append([nm, gi // PER_PAGE + 1, r["object_id"], 0])
+                groups.append([nm, gi // PER_PAGE + 1, r["object_id"], 0])   # same numbering as page_no+1
             groups[-1][3] += 1
         rows = "".join(
             f"<tr class='r'><td><a style='color:#7c9cff' href='{PREFIX}{pg:03d}.html#{oid}'>"
@@ -135,7 +202,7 @@ def main():
                                    marker=dict(size=1.2, color="#cccccc", opacity=0.3), hoverinfo="skip"))
         for vi2, (ta, tb) in enumerate([(d["scoreA"], d["scoreB"]), (d["scoreA_raw"], d["scoreB_raw"])]):
             a, b = ta > THR, tb > THR
-            for mm, col in ((a & ~b, A_COL), (b & ~a, B_COL), (a & b, "#dc28a0")):
+            for mm, col in ((a & ~b, A_COL), (b & ~a, B_COL), (a & b, OVL_COL)):
                 idx = np.nonzero(mm)[0]
                 if len(idx) > 3500:
                     idx = rng.choice(idx, 3500, replace=False)
@@ -178,16 +245,22 @@ def main():
                          f"<img loading='lazy' src='{rel}' alt='v{vi}'></a>"
                          f"<figcaption>view {vi:02d}</figcaption></figure>")
         return (f"<details class='roledet'><summary style='border-left-color:{col}'>"
-                f"Role {'AB'[ri]} views — {hits}/{n_views} hit(Molmo points;SAM 每視角 mask v2 未存檔)</summary>"
-                f"<div class='views'>{''.join(cells)}</div></details>"), hits
+                f"Role {'AB'[ri]} views — {hits}/{n_views} hit(Molmo points, PRE exist-gate;"
+                f"SAM 每視角 mask 未存檔)</summary>"
+                f"<div class='views'>{''.join(cells)}</div></details>")
 
     page_objs = []
     e = min(e, len(done))
+    # pages are numbered from the GLOBAL object index so a partial [s:e] run
+    # overwrites exactly the pages it re-renders; a start that is not a
+    # multiple of PER_PAGE would collide, so it is rejected outright
+    if s % PER_PAGE:
+        sys.exit(f"start must be a multiple of PER_PAGE={PER_PAGE} (got {s})")
+    page_no = s // PER_PAGE
     for gi in range(s, e):
         page_objs.append(done[gi])
         if len(page_objs) == PER_PAGE or gi == e - 1:
-            page_no = (gi - len(page_objs) + 1) // PER_PAGE
-            body, n_tasks = [], 0
+            body, n_tasks, recipe = [], 0, ""
             for rec, qlist in page_objs:
                 oid = rec["object_id"]
                 od = os.path.join(ROOT, oid)
@@ -206,6 +279,7 @@ def main():
                         for vi in range(n_views):
                             p = f"{obj_root}/{vi:05d}/{vi:05d}.png"
                             renders.append(Image.open(p).convert("RGB") if os.path.exists(p) else Image.new("RGB", (512, 512)))
+                    recipe = recipe or str(m.get("engine", {}).get("recipe", ""))
                     xyz = d["xyz"].astype(np.float32)
                     spec = plot_spec(xyz, d)
                     qi = qd.split("_")[0]
@@ -220,8 +294,10 @@ def main():
                             f"<span class='tgt'>target: {esc(str(ro.get('target','')))}</span></div>"
                             f"<div class='fn'>{esc(str(ro.get('function','')))}</div>"
                             f"<div class='molmo'><span class='pt'>Point&nbsp;&rarr;</span> {esc(mq)}</div>")
-                    stripA, _ = role_strip(oid, qd, 0, d["ptsA"][:n_views], renders, n_views)
-                    stripB, _ = role_strip(oid, qd, 1, d["ptsB"][:n_views], renders, n_views)
+                    strips = ""
+                    if "ptsA" in d.files:   # pre-07-17 outputs stored no per-view points
+                        strips = (role_strip(oid, qd, 0, d["ptsA"][:n_views], renders, n_views)
+                                  + role_strip(oid, qd, 1, d["ptsB"][:n_views], renders, n_views))
                     cards.append(
                         f"<div class=\"card\"><div class=\"body\">"
                         f"<div class=\"qhead\"><span class='badge inter'>{esc(str(m.get('coordination','')))}</span>"
@@ -231,7 +307,7 @@ def main():
                         f"<div class=\"roles\">{roles_html}</div></div>"
                         f"<div class='plotdiv'><div class='plot3d' style='width:500px;height:360px;margin:auto'></div>"
                         f"<script type='application/json' class='plotspec'>{spec}</script></div>"
-                        f"{stripA}{stripB}</div>")
+                        f"{strips}</div>")
                     n_tasks += 1
                 body.append(
                     f"<div class='obj' id='{oid}'><div class='obj-head'><span class='name'>{esc(rec['object_name'])}</span>"
@@ -239,10 +315,10 @@ def main():
                     f"<div class='grid'>{''.join(cards)}</div></div>")
             html = (f"<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"/>"
                     f"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>"
-                    f"<title>stage2_full review — p{page_no+1}</title>\n{css}{EXTRA_CSS}{plotlyjs}</head><body>"
+                    f"<title>stage2_full review — p{page_no+1}</title>\n{BASE_CSS}{EXTRA_CSS}{plotlyjs}</head><body>"
                     f"<header><h1>Stage 2 FULL — grounding review(頁 {page_no+1}/{n_pages_total})</h1>"
                     f"<div class=\"meta\">{len(page_objs)} objects · {n_tasks} tasks · "
-                    f"mixed+neg → refine → partition → post-prune;卡片含互動 plotly(FINAL/raw)與 Role 40-view 展開</div>"
+                    f"{esc(recipe)};卡片含互動 plotly(FINAL/raw)與 Role 40-view 展開</div>"
                     f"<div class=\"legend\"><span><i style=\"background:{A_COL}\"></i>Role A</span>"
                     f"<span><i style=\"background:{B_COL}\"></i>Role B</span>"
                     f"<span><i style=\"background:lightgrey\"></i>object cloud</span></div></header>"
@@ -251,6 +327,7 @@ def main():
             open(out, "w", encoding="utf-8").write(html)
             print(f"{out} ({os.path.getsize(out)/1e6:.1f} MB, {len(page_objs)} objs, {n_tasks} tasks)", flush=True)
             page_objs = []
+            page_no += 1
 
 
 if __name__ == "__main__":

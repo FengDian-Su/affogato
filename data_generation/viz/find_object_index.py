@@ -2,21 +2,22 @@
 """
 find_object_index.py — 由 object_id 反查它在 stage1 json 裡的第幾筆 (0-based index)。
 
-stage2_bimanual_grounding.py 是用 stage1 記錄的 index (--start/--end) 來切批次，
+pipeline/stage2_v2.py 是用 stage1 記錄的 index (--start/--end) 來切批次，
 所以知道「正在跑的 object_id」對應的 index，就能知道批次跑到哪、還剩多少。
+注意 stage1 分成 part0/part1 兩檔，index 是各檔內的 0-based 序號。
 
 用法：
     # 查一個或多個 object_id (可接短前綴)
     python viz/find_object_index.py 8fd4afdf bc2fe4e8
 
-    # 換一個 stage1 檔
-    python viz/find_object_index.py --stage1 outputs/stage1_part0.json 8fd4afdf
+    # 換一個 stage1 檔 (part1 的物件要用 part1 才查得到)
+    python viz/find_object_index.py --stage1 outputs/stage1_v2/stage1_part1.json 8fd4afdf
 
     # 從 stdin 讀 (每行一個 id)，例如 ls 正在跑的輸出目錄
-    ls outputs/bimanual_grounding | python viz/find_object_index.py -
+    ls outputs/bimanual_grounding_v2 | python viz/find_object_index.py -
 
     # 掃已完成的輸出目錄，回報目前批次跑到的 index 範圍 (min/max) = 進度
-    python viz/find_object_index.py --progress outputs/bimanual_grounding
+    python viz/find_object_index.py --progress outputs/bimanual_grounding_v2
 """
 import os
 import sys
@@ -45,16 +46,6 @@ def _obj_mtime(root, object_id):
     return best
 
 
-def _dir_now(root):
-    """避免用 time.time() (受 sandbox 影響)；取目錄裡最新的 mtime 當『現在』。"""
-    latest = os.path.getmtime(root)
-    for d in os.listdir(root):
-        m = _obj_mtime(root, d)
-        if m and m > latest:
-            latest = m
-    return latest
-
-
 def load_index(stage1_path):
     """回傳 (records, id2idx)。id2idx: 完整 object_id -> index。"""
     records = json.load(open(stage1_path))
@@ -81,8 +72,8 @@ def main():
     ap = argparse.ArgumentParser(description="由 object_id 反查 stage1 json 的 index")
     ap.add_argument("ids", nargs="*",
                     help="一個或多個 object_id (可短前綴)；用 '-' 從 stdin 逐行讀")
-    ap.add_argument("--stage1", default="outputs/stage1_part0_backup_0708.json",
-                    help="stage1 json (預設 = stage2 目前吃的 0708 backup)")
+    ap.add_argument("--stage1", default="outputs/stage1_v2/stage1_part0.json",
+                    help="stage1 json (預設 part0；part1 的物件要另外指定 --stage1)")
     ap.add_argument("--progress", metavar="DIR",
                     help="掃這個輸出目錄下的 object 子資料夾，回報 index 範圍 (跑到哪)")
     ap.add_argument("--shards", metavar="A-B,C-D,...",
@@ -105,7 +96,6 @@ def main():
         # --- 逐 shard 回報 (需要 mtime 算速率/ETA) ---
         if args.shards:
             idx2id = {i: r["object_id"] for i, r in enumerate(records)}
-            now = _dir_now(root)
             print(f"{'shard':<8}{'range':<14}{'done':>6}{'total':>7}{'pct':>7}"
                   f"{'frontier':>10}{'min/obj':>9}   ETA")
             for k, seg in enumerate(args.shards.split(",")):

@@ -1,8 +1,8 @@
 """Molmo2-8B pointing on vLLM — the stage2 (pipeline/stage2_v2.py) pointing engine.
 
 Validated 2026-07-11 on the 10-object human-GT benchmark (scratchpad
-vllm_m2_point.py / vllm_m2_score.py): k=1 parity with transformers 0.847-vs-0.844
-meanAUC; 96-113 ms/view = ~15x transformers serial.
+vllm_m2_point.py / vllm_m2_score.py): parity with the transformers reference
+(0.847 vs 0.844 meanAUC); 96-113 ms/view = ~15x transformers serial.
 
 Everything official:
 - engine: vLLM 0.16 native Molmo2 support (`molmo` conda env, torch 2.9.1+cu128).
@@ -15,7 +15,10 @@ Everything official:
   (multi-image chunking retired 07-19, commit 3c500b3).
 - parsing: point_formatter_official.py (verbatim copy of AI2 molmo2 repo
   olmo/preprocessing/point_formatter.py) — coords="idx x y" triplets, /1000
-  scale, 1-based image indices.
+  scale, 1-based image indices. We call UnifiedPointFormatter.extract_points
+  directly rather than the module-level extract_points wrapper: the wrapper
+  falls back to LegacyPointFormatting, whose looser regexes match stray digits
+  in prose, and Molmo2 only ever emits the unified format.
 """
 import os
 import sys
@@ -25,11 +28,14 @@ import importlib.util
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 MODEL_ID = "allenai/Molmo2-8B"
+DEDUP_PX = 3.0   # two points this close in one view are the same instance
 
 
 def load_official_extractor():
     """Import the vendored AI2 point_formatter with its two olmo deps stubbed
-    (parse_timestamp is only used for video timestamps; PointTrack is a TypedDict)."""
+    (parse_timestamp is only used for video timestamps; PointTrack is a
+    TypedDict). Runs at import time and the stubs are process-global: nothing
+    else in a stage2 process may import the real `olmo`."""
     for name, attrs in [("olmo", {}), ("olmo.util", {"parse_timestamp": lambda s: float(s)}),
                         ("olmo.data", {}), ("olmo.data.academic_video_track_datasets", {"PointTrack": dict})]:
         if name not in sys.modules:
@@ -48,7 +54,7 @@ _pf = load_official_extractor()
 _UPF = _pf.UnifiedPointFormatter()
 
 
-def load_engine(gpu_memory_utilization=0.5, max_images=1, max_model_len=8192):
+def load_engine(gpu_memory_utilization=0.5, max_model_len=8192):
     """Start the vLLM engine + processor. Call ONCE per process, before SAM2."""
     os.environ.setdefault("VLLM_WORKER_MULTIPROC_METHOD", "spawn")
     from vllm import LLM
@@ -57,38 +63,55 @@ def load_engine(gpu_memory_utilization=0.5, max_images=1, max_model_len=8192):
     llm = LLM(model=MODEL_ID, trust_remote_code=True,
               gpu_memory_utilization=gpu_memory_utilization,
               max_model_len=max_model_len,
-              limit_mm_per_prompt={"image": max_images, "video": 0},
+              limit_mm_per_prompt={"image": 1, "video": 0},
               mm_encoder_attn_backend="TORCH_SDPA")
     return llm, proc
 
 
-def render_prompt(proc, question, n_images):
-    msgs = [{"role": "user", "content": [dict(type="text", text=question),
-                                         *[dict(type="image") for _ in range(n_images)]]}]
+def render_prompt(proc, question):
+    msgs = [{"role": "user", "content": [dict(type="text", text=question), dict(type="image")]}]
     return proc.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
 
 
 def p_exist_from_logprobs(logprobs0):
-    """P(target exists) from the position-0 alternatives of a k=1 pointing call.
+    """P(target exists) from the position-0 alternatives of a pointing call.
 
-    Molmo2's trained answer templates open with '<points ...' (target present)
-    or 'There are none.' (absent) — the first generated token is the model's
-    own existence decision. Subset softmax between the two camps; other
-    openers (incl. '<|...' special tokens) are ignored. Measured on 500
-    objects: AUROC 0.912 vs hallucinated points, monotonically calibrated
-    (bucket [0.99,1] -> 94% real), while coordinate-token logprobs carry no
-    signal (AUROC 0.45).
+    Under this prompt Molmo2 answers in exactly two shapes: '<points ...'
+    (target present) or 'There are none.' (absent) — the first generated token
+    IS the model's existence decision. Subset softmax between the two camps.
+    Measured on 500 objects / 7968 requests: 0 non-standard openers, AUROC
+    0.912 vs hallucinated points, monotonically calibrated (bucket [0.99,1] ->
+    94% real), while coordinate-token logprobs carry no signal (AUROC 0.45).
+
+    Returns None (= "no opinion", the caller then keeps the view) unless the
+    ARGMAX token is itself in a camp. Without that guard the subset softmax
+    would happily report 0.999 off a 1e-3-vs-1e-9 tail ratio while 98% of the
+    real mass sat on some third opener — a fabricated high confidence in
+    precisely the bucket the exist gate trusts most. The formatter also has
+    count-first templates ('There are N <points...>') that token 0 cannot
+    separate from 'There are none.'; none occurred in the 7968 measured
+    requests, and the argmax guard does not catch them — if the template ever
+    changes, re-measure rather than re-tune the threshold.
     """
     from math import exp
-    p_pts = p_none = 0.0
-    for lp in logprobs0.values():
+
+    def camp(lp):
         # normalize BPE piece markers so camp matching survives tokenizer variants
         t = lp.decoded_token.replace("Ġ", " ").replace("▁", " ").strip().lower()
-        pr = exp(lp.logprob)
         if t.startswith("<") and not t.startswith("<|"):
-            p_pts += pr
-        elif t.startswith("there"):
-            p_none += pr
+            return "pts"
+        return "none" if t.startswith("there") else None
+
+    top = max(logprobs0.values(), key=lambda lp: lp.logprob)
+    if camp(top) is None:
+        return None
+    p_pts = p_none = 0.0
+    for lp in logprobs0.values():
+        c = camp(lp)
+        if c == "pts":
+            p_pts += exp(lp.logprob)
+        elif c == "none":
+            p_none += exp(lp.logprob)
     tot = p_pts + p_none
     return p_pts / tot if tot > 1e-6 else None
 
@@ -106,7 +129,7 @@ def ground_queries(llm, proc, view_images, molmo_queries, max_tokens=512):
     errors across views (defeating the 40-view vote), and had no per-view
     decision token.
 
-    view_images: list[PIL.Image] (equal sizes)
+    view_images: list[PIL.Image]
     molmo_queries: flat list[str] of stage1-style "Point to ..." queries (the
         caller passes every query x both roles of one object, in order)
     Returns: (per_query, p_exist) — per query: per-view LIST of [x, y]
@@ -116,14 +139,16 @@ def ground_queries(llm, proc, view_images, molmo_queries, max_tokens=512):
     """
     from vllm import SamplingParams
     T = len(view_images)
-    W, H = view_images[0].size
     reqs = []
     for q in molmo_queries:
-        prompt = render_prompt(proc, q, 1)
+        prompt = render_prompt(proc, q)
         for vi in range(T):
             reqs.append({"prompt": prompt, "multi_modal_data": {"image": [view_images[vi]]}})
     outs = llm.generate(reqs, SamplingParams(temperature=0.0, max_tokens=max_tokens, logprobs=20),
                         use_tqdm=False)
+    # vLLM returns outputs in request order; divmod below silently shifts EVERY
+    # later (query, view) into the wrong query if that ever stops holding
+    assert len(outs) == len(reqs), f"vLLM returned {len(outs)} of {len(reqs)} outputs"
     per_query = [[[] for _ in range(T)] for _ in molmo_queries]
     p_exist = [[None] * T for _ in molmo_queries]
     n_trunc = 0
@@ -135,8 +160,9 @@ def ground_queries(llm, proc, view_images, molmo_queries, max_tokens=512):
         if o.logprobs:
             p_exist[qi][vi] = p_exist_from_logprobs(o.logprobs[0])
         lst = per_query[qi][vi]
+        W, H = view_images[vi].size   # the formatter scales normalized coords by THIS view's size
         for x, y in _UPF.extract_points(o.text, W, H):
-            if not any((x - px) ** 2 + (y - py) ** 2 < 9.0 for px, py in lst):
+            if not any((x - px) ** 2 + (y - py) ** 2 < DEDUP_PX ** 2 for px, py in lst):
                 lst.append([float(x), float(y)])
     if n_trunc:
         print(f"WARNING molmo2_vllm: {n_trunc}/{len(reqs)} generations hit "

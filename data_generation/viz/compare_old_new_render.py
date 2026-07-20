@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 """Old-vs-new segmentation comparison renders.
 
-For (oid, qdir) pairs present in BOTH outputs/bimanual_grounding (old prod,
-July 4) and outputs/stage2_full (new prod), render a 4-row figure with the
-SAME renderer/cameras: OLD raw, OLD final, NEW raw, NEW final; 4 azimuths.
+For (oid, qdir) pairs present in BOTH directories below, render a 4-row
+figure with the SAME renderer/cameras: OLD raw, OLD final, NEW raw, NEW final;
+4 azimuths. Point OLD/NEW at whichever two output generations you are
+comparing — as shipped they are the July-4 run vs stage2_full, BOTH of which
+predate the current recipe (exist gate / multi-point / 2D overlap, whose
+output lands in outputs/bimanual_grounding_v2).
 Run: mm python compare_old_new_render.py [n_samples] [seed]
 """
 import os, sys, json, random
@@ -65,7 +68,7 @@ def render_pair(job):
            f"OLD  A:{ro[0].get('contact_region')} | B:{ro[1].get('contact_region')}\n"
            f"NEW  A:{rn[0].get('contact_region')} ({rn[0].get('target')}) | "
            f"B:{rn[1].get('contact_region')} ({rn[1].get('target')})")
-    fig.suptitle(ttl, fontsize=10)
+    fig.suptitle(ttl.replace("$", r"\$"), fontsize=10)   # a lone $ turns on mathtext and raises at savefig
     fig.subplots_adjust(left=0.03, right=0.99, top=0.92, bottom=0.01,
                         wspace=0.0, hspace=0.02)
     fig.savefig(out, dpi=78)

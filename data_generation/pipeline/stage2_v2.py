@@ -10,8 +10,8 @@ and the retired MolmoPoint runner:
   faster than MolmoPoint k4xB12 and ~15x the old serial chain.
 - Per OBJECT, every query x both roles goes into ONE llm.generate — vLLM
   continuous batching replaces any manual chunk/batch machinery.
-- SAM2 runs object-batched (official set_image_batch: encoder once per object)
-  with the voting projection geometry cached per object.
+- SAM2 runs object-batched (official set_image_batch: encoder once per
+  --sam_chunk view window) with the voting projection geometry cached per object.
 - Lean outputs: per query only scores.npz + meta.json (with per-view points);
   the stage02 notebook browser renders overlays from them on demand.
 - 07-17 recipe (validated on 195 queries / 50 diverse objects): "mixed+neg"
@@ -31,7 +31,8 @@ and the retired MolmoPoint runner:
   ptsA_multi/ptsB_multi ((M,3) rows vi,x,y — ALL Molmo points, pre-gate) and
   pexistA/pexistB ((T,) P(exist) per view), so the existence threshold can be
   re-applied post hoc in either direction. scoreA_raw/scoreB_raw are the
-  votes AFTER the 2D overlap resolution.
+  votes after the consensus view-drop AND the 2D overlap resolution — "raw"
+  now means only "before the 3D refine/partition chain".
 
 Run with the **molmo** conda env (vllm 0.16 + torch cu128 + SAM2 installed):
   ~/miniconda3/envs/molmo/bin/python pipeline/stage2_v2.py --start 0 --end 100 --gpu 3
@@ -112,23 +113,22 @@ def is_body_target(role):
     return str(role.get("target", "")).strip().lower() == "body"
 
 
-def expand_sam_subqueries(queries, sam_pts):
+def expand_sam_subqueries(body_flags, sam_pts):
     """SAM jobs from the (gated) per-view point lists, one sub-query per point
     slot: slot s of flat role j prompts each view's s-th point separately
     (multi-instance targets need one mask per instance, not one multi-positive
     blob); the caller max-merges slots back into the role's heatmaps.
 
-    Per sub-query: candidate selection (target exactly "body" -> the LARGEST
-    candidate = whole visible face; every other target -> best_iou) and the
-    partner role's first point
-    as a negative prompt when it sits >NEG_MIN_PX from THIS slot's positive
-    (separates e.g. mug handle from body masks without ever giving SAM a
-    near-coincident positive/negative pair).
+    Per sub-query: candidate selection (body target -> BODY_SELECT, the whole
+    visible face; every other target -> best_iou) and the partner role's first
+    point as a negative prompt when it sits >NEG_MIN_PX from THIS slot's
+    positive (separates e.g. mug handle from body masks without ever giving
+    SAM a near-coincident positive/negative pair).
 
+    body_flags: is_body_target per flat role, same order as sam_pts.
     Returns (sub_points, sub_owner, sub_selects, sub_negs), parallel lists.
     """
-    selects = [BODY_SELECT if is_body_target(q["roles"][r]) else "best_iou"
-               for _, q in queries for r in range(2)]
+    selects = [BODY_SELECT if b else "best_iou" for b in body_flags]
     sub_points, sub_owner, sub_selects, sub_negs = [], [], [], []
     for j, pq in enumerate(sam_pts):
         partner = sam_pts[j + 1 if j % 2 == 0 else j - 1]
@@ -205,7 +205,7 @@ def process_object(rec, scene, canvas, queries, per_query, heatmaps_all, proj,
             "n_views": scene.n_views,
             "hitA": int(np.isfinite(ptsA[:, 0]).sum()), "hitB": int(np.isfinite(ptsB[:, 0]).sum()),
             "coverage": float((counts > 0).mean()),
-            "engine": {"name": "molmo2-vllm", "k": 1, "sam2": "object-batched",
+            "engine": {"name": "molmo2-vllm", "sam2": "object-batched",
                        "recipe": "mixed+neg / exist-gate / consensus-validation / "
                                  "2d-overlap / refine / partition-v6 / post-prune",
                        **recipe_flags},
@@ -285,16 +285,18 @@ def main():
                             for pts, p in zip(pq, pe)]
                            for pq, pe in zip(per_query, p_exist)]
             t_point = time.time() - t0
-            sub_points, sub_owner, sub_selects, sub_negs = expand_sam_subqueries(queries, sam_pts)
+            body_flags = [is_body_target(q["roles"][r]) for _, q in queries for r in range(2)]
+            sub_points, sub_owner, sub_selects, sub_negs = expand_sam_subqueries(body_flags, sam_pts)
             # per-image outputs are independent, so encoding the views in chunks is
             # equivalent; it only caps the encoder's peak memory
             heat_sub = None
             for v0 in range(0, n_views, args.sam_chunk):
                 hm = sra.run_sam2_object_queries(scene.view_images_np[v0:v0 + args.sam_chunk],
                                                  [q[v0:v0 + args.sam_chunk] for q in sub_points],
-                                                 sam2_predictor, cfg,
-                                                 neg_points=[n[v0:v0 + args.sam_chunk] for n in sub_negs],
-                                                 mask_selects=sub_selects)
+                                                 sam2_predictor, sub_selects,
+                                                 neg_points=[n[v0:v0 + args.sam_chunk] for n in sub_negs])
+                # list CONCATENATION, not array addition: each window returns
+                # this sub-query's heatmaps for its own views, appended in view order
                 heat_sub = hm if heat_sub is None else [a + b for a, b in zip(heat_sub, hm)]
             # merge slot masks per role per view: same-instance masks average
             # (consensus, no fringe inflation), distinct instances union
@@ -305,7 +307,7 @@ def main():
                 [sra.merge_instance_masks([heat_sub[si][vi] for si in slots
                                            if len(sub_points[si][vi])] or [heat_sub[slots[0]][vi]])
                  for vi in range(n_views)]
-                for slots, j in zip(slots_of, range(len(per_query)))]
+                for slots in slots_of]
             proj = sra.precompute_projection(canvas.xyz_vote, scene.cameras, scene.K_list,
                                              scene.depth_maps, cfg.depth_tolerance)
             # consensus validation for NAMED-PART roles: vote once, then drop
@@ -316,7 +318,12 @@ def main():
             # everywhere through mean-voting) WITHOUT any mask-size prior —
             # a plate seen face-on is huge but agrees with its own consensus.
             # Body-level roles legitimately mask the whole object: exempt.
-            body_flags = [is_body_target(q["roles"][r]) for _, q in queries for r in range(2)]
+            # KNOWN COUPLING with --exist_thr: score1 averages over the views
+            # that GEOMETRICALLY see a point, gated views included as zeros, so
+            # a role surviving in <6/40 views can never reach the 0.15 core
+            # level and the check silently disables itself — exactly the sparse
+            # case where one bad view weighs most. The absolute levels below
+            # were calibrated pre-gate; revisit together, not separately.
             for j, hms in enumerate(heatmaps_all):
                 if body_flags[j]:
                     continue
@@ -345,7 +352,8 @@ def main():
                                  idxNN, (t_point + t_sam) / len(queries), args.output_dir,
                                  p_exist=p_exist,
                                  recipe_flags=dict(overlap2d=bool(args.overlap2d),
-                                                   exist_thr=args.exist_thr))
+                                                   exist_thr=args.exist_thr,
+                                                   body_select=args.body_select))
         except KeyboardInterrupt:
             raise
         except Exception as e:

@@ -110,9 +110,9 @@ def main():
             hms = [[] for _ in qp]
             for v0 in range(0, T, CHUNK):
                 part = sra.run_sam2_object_queries(
-                    vi_np[v0:v0 + CHUNK], [q[v0:v0 + CHUNK] for q in qp], sam2, cfg,
-                    neg_points=[n[v0:v0 + CHUNK] for n in negs],
-                    mask_selects=["middle"] * len(qp))
+                    vi_np[v0:v0 + CHUNK], [q[v0:v0 + CHUNK] for q in qp], sam2,
+                    ["middle"] * len(qp),
+                    neg_points=[n[v0:v0 + CHUNK] for n in negs])
                 for qi, h in enumerate(part):
                     hms[qi].extend(h)
             for (qd, r), hm in zip(owners, hms):

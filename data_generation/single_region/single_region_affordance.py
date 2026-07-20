@@ -12,12 +12,17 @@ Contents:
     intrinsics, camera poses, EXR depth, view loading, affogato->camera frame
     alignment.
   * SAM2: load_sam2_model, run_sam2_object_queries (official set_image_batch /
-    predict_batch, encoder once per object; per-query mask_selects + partner
-    negative points — the "mixed+neg" prompt recipe).
+    predict_batch, encoder once per VIEW WINDOW — the caller chunks views to
+    cap encoder memory; per-query mask_selects + partner negative points —
+    the "mixed+neg" prompt recipe).
+  * Per-view 2D mask ops (before any 3D voting exists): merge_instance_masks,
+    resolve_2d_overlap.
   * Multi-view voting: precompute_projection + sample_heatmaps_projected.
-  * Canvas refinement + two-role partition (validated 07-15 on 195 queries /
-    50 category-diverse objects): knn_indices, cc_prune, refine_scores,
-    partition_two_roles, prune_partitioned.
+  * Canvas refinement + two-role partition: knn_indices, cc_prune,
+    refine_scores, partition_two_roles, prune_partitioned. The refinement
+    functions were validated 07-15 on 195 queries / 50 category-diverse
+    objects; partition_two_roles has changed twice since (gravity axis 07-16,
+    long-axis cut 07-17) and carries its own dated notes.
   * Stage2 object/scene loading: Canvas / Scene, build_aff_map, resolve_object,
     load_canvas, load_scene.
 
@@ -98,16 +103,26 @@ def convert_pose_flip_yz(c2w):
 def read_depth_from_exr(exr_path, camera_position):
     """*_nd.exr: channels 0-2 = world normal, channel 3 = depth. Near-plane invalid -> 0."""
     cam_distance = np.linalg.norm(camera_position)
-    near = 0.867  # sqrt(3) * 0.5 ; object normalised into unit sphere
+    # G-Objaverse normalises each object into the unit cube, so no real surface
+    # can sit nearer than cam_distance - half_diagonal; anything closer is the
+    # renderer's near-plane sentinel and is zeroed so the visibility test
+    # rejects it.
+    near = 0.867  # sqrt(3) * 0.5 = half the unit cube's diagonal
     near_distance = cam_distance - near
-    normald = cv2.imread(exr_path, cv2.IMREAD_UNCHANGED).astype(np.float32)
+    normald = cv2.imread(exr_path, cv2.IMREAD_UNCHANGED)
+    if normald is None:
+        raise IOError(f"unreadable EXR depth: {exr_path}")
+    normald = normald.astype(np.float32)
     depth = normald[..., 3]
     depth[depth < near_distance] = 0
     return depth, normald[..., :3]
 
 
 def count_available_views(img_folder_path):
-    """Number of consecutive views 0,1,2,... that have a full {png,nd.exr,json} triplet."""
+    """Number of CONSECUTIVE views 0,1,2,... with a full {png,nd.exr,json}
+    triplet — deliberately a prefix count, not a completeness count: the
+    pipeline indexes views positionally, so it stops at the first gap and
+    loses whatever follows it (measured: 1 render root in 120 has a gap)."""
     n = 0
     while True:
         d = os.path.join(img_folder_path, f"{n:05d}")
@@ -183,26 +198,33 @@ def load_sam2_model(checkpoint, model_cfg, device):
 def _select_mask_idx(masks, iou_scores, mask_select):
     """Pick one of SAM2's 3 candidate masks. Granularities by area:
     middle ~ part, largest ~ whole visible face; best_iou = SAM2's own
-    predicted-quality argmax."""
+    predicted-quality argmax.
+
+    masks are raw logits (predict_batch runs with return_logits=True), so
+    `m > 0` is exactly p > 0.5 — the area used to rank the candidates."""
     if mask_select in ("middle", "largest"):
         order = np.argsort([(m > 0).sum() for m in masks])
         return int(order[{"middle": 1, "largest": 2}[mask_select]])
     return int(np.argmax(iou_scores))
 
 
-def run_sam2_object_queries(view_images_np, queries_points, sam2_predictor, cfg: PipelineConfig,
-                            neg_points=None, mask_selects=None):
+def run_sam2_object_queries(view_images_np, queries_points, sam2_predictor, mask_selects,
+                            neg_points=None):
     """SAM2 for ALL queries of one view window, encoder run once per window.
 
     Official batch API: set_image_batch embeds every view a single time, then
     predict_batch (decoder-only, ~ms/view) runs per query.
 
     queries_points: list over queries of points_per_view (list[T] of [K,2] arrays).
+    mask_selects:   per-query candidate selection, see _select_mask_idx.
     neg_points:     optional, same nesting: one negative point (or None) per
                     query per view, passed to SAM with label 0 (the partner
                     role's point separates e.g. mug body from handle masks).
-    mask_selects:   per-query candidate selection (required).
     Returns: list over queries of heatmap lists (list[T] of [H,W] float32).
+    Point-less views get a SHARED all-zero array (not a copy) — cheap, but it
+    means every empty view of every query aliases one buffer: never mutate a
+    returned heatmap in place unless the view has points (resolve_2d_overlap
+    relies on exactly that).
     """
     T = len(view_images_np)
     H, W = view_images_np[0].shape[:2]
@@ -241,7 +263,7 @@ def run_sam2_object_queries(view_images_np, queries_points, sam2_predictor, cfg:
 # Multi-view voting
 # ==============================================================================
 
-def precompute_projection(points, cameras, K_list, depths, depth_tolerance=0.05):
+def precompute_projection(points, cameras, K_list, depths, depth_tolerance):
     """Per-object geometry cache for the voting projection: (u_int, v_int, valid)
     per view — depends only on the object, shared by every role/query."""
     N = len(points)
@@ -351,12 +373,17 @@ UP_AXIS = 1                        # gravity axis of the original canvas frame.
                                    # chance). Also equals the camera-rig image-up mapped through
                                    # align_affogato_frame (vote-z == original y).
 HOR_AXES = [0, 2]
+SUPPORT_THR = 0.15                 # "this point belongs to the region" cutoff, shared by every
+                                   # refinement/partition step below so they cannot drift apart.
+                                   # NOT a faint-signal floor: voted scores are dense (measured on
+                                   # 120 real roles, median 79% of canvas points exceed it), so
+                                   # this is a mid-mass cutoff.
 HI_RE = re.compile(r"\b(upper|top|uppermost)\b", re.I)
 LO_RE = re.compile(r"\b(lower|bottom|base|beneath|under|below)\b", re.I)
 OPP_RE = re.compile(r"\b(opposite|other side|each side|both sides|two sides|either side)\b", re.I)
 # partition gate for "body-level" targets; DELIBERATELY wider than the SAM
-# mask-selection rule (stage2_v2.is_body_target: body/wall/surface only) —
-# the two were calibrated separately, do not unify.
+# mask-selection rule (stage2_v2.is_body_target, an EXACT "body" match since
+# 2db61cb) — the two were calibrated separately, do not unify.
 BODY_TARGET_RE = re.compile(r"\b(body|wall|surface|face|corner|side|bag)\b", re.I)
 
 
@@ -381,18 +408,18 @@ def _support_components(s, idxNN, thr):
     from scipy.sparse import coo_matrix
     from scipy.sparse.csgraph import connected_components
     pi = np.nonzero(s > thr)[0]
-    inv = -np.ones(len(s), dtype=np.int64)
+    inv = -np.ones(len(s), dtype=np.int64)   # global point id -> local index in pi, -1 = outside support
     inv[pi] = np.arange(len(pi))
-    dst = inv[idxNN[pi].ravel()]
+    dst = inv[idxNN[pi].ravel()]             # COO edges: each support point's k neighbours, flattened
     src = np.repeat(np.arange(len(pi)), idxNN.shape[1])
-    ok = dst >= 0
+    ok = dst >= 0                            # drop edges that leave the support
     g = coo_matrix((np.ones(int(ok.sum())), (src[ok], dst[ok])),
                    shape=(len(pi), len(pi)))
     ncc, lab = connected_components(g, directed=False)
     return pi, lab, np.bincount(lab, weights=s[pi], minlength=ncc)
 
 
-def cc_prune(s, idxNN, thr=0.15, keep_frac=0.10):
+def cc_prune(s, idxNN, thr=SUPPORT_THR, keep_frac=0.10):
     """Drop satellite components holding < keep_frac of the largest one's mass."""
     if (s > thr).sum() < 5:
         return s
@@ -402,7 +429,7 @@ def cc_prune(s, idxNN, thr=0.15, keep_frac=0.10):
     return out
 
 
-def refine_scores(s, idxNN, thr=0.15, iters=2, alpha=0.6):
+def refine_scores(s, idxNN, thr=SUPPORT_THR, iters=2, alpha=0.6):
     """Pre-partition cleanup: satellite prune + kNN smoothing (fills interior
     holes, decays isolated specks)."""
     out = cc_prune(s, idxNN, thr).astype(np.float32)
@@ -411,7 +438,7 @@ def refine_scores(s, idxNN, thr=0.15, iters=2, alpha=0.6):
     return out
 
 
-def prune_partitioned(score, s_ref, idxNN, thr=0.15):
+def prune_partitioned(score, s_ref, idxNN, thr=SUPPORT_THR):
     """Post-partition satellite prune (clears winner-take-all remnants) with an
     erase guard: cleanup must not delete the signal, so pruning is skipped when
     it would leave <20% of the role's pre-partition support s_ref."""
@@ -422,14 +449,19 @@ def prune_partitioned(score, s_ref, idxNN, thr=0.15):
 
 
 def _score_anchor(s, xyz):
-    """Weighted centroid of the top-5% scores (None if the score is empty)."""
+    """Weighted centroid of the top-5% scores (None if the score is empty).
+
+    Degenerate when the support is under 5% of the canvas: p95 == 0 selects
+    every point and this becomes the whole-score mass centroid. Rare in
+    practice because voted scores are dense (measured on 120 real roles:
+    median 79% of canvas points exceed SUPPORT_THR), so it is left alone."""
     m = s >= np.percentile(s, 95)
     if not m.any() or s[m].sum() <= 0:
         return None
     return (xyz[m] * s[m, None]).sum(0) / s[m].sum()
 
 
-def partition_two_roles(scoreA, scoreB, roleA, roleB, xyz, thr=0.15):
+def partition_two_roles(scoreA, scoreB, roleA, roleB, xyz, thr=SUPPORT_THR):
     """Resolve the two grounded role heatmaps into two DISJOINT regions.
 
     Molmo grounds each role independently, so symmetric co-lifts collapse onto
@@ -438,10 +470,12 @@ def partition_two_roles(scoreA, scoreB, roleA, roleB, xyz, thr=0.15):
 
     1) text-declared SYMMETRY -- same target, contact_regions carry
        opposite/other-side wording, no one-sided vertical relation:
-       straight vertical cut through the region center along the canvas axis
-       whose center plane crosses the least material (canvas frames are
-       canonical, so box walls align with axes; angle scans tilt on count
-       noise). Sides assigned by each role's own mass.
+       straight vertical cut through the region center, normal to its LONGEST
+       horizontal canvas axis — hands grab the two far ends of the long axis
+       (canvas frames are canonical, so box walls align with axes; angle scans
+       tilt on count noise). Sides assigned by each role's own mass. The
+       earlier least-material-crossing rule picked the SHORT axis in 27% of
+       measured co-lift cases and was replaced 07-17.
     2) text-declared VERTICAL relation -- horizontal (gravity) cut at the two
        roles' anchor-height midpoint, the declared-upper role above. Triggers
        on same-target pairs with a vertical relation, or on any pair where BOTH
