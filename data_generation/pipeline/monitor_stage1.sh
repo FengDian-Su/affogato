@@ -19,17 +19,25 @@ log() { echo "$(date '+%F %T') $*" >> "$LOG"; }
 
 count() {   # objects + errors written so far inside [START,END)
   "$PY" - "$OUT" "$START" "$END" <<'PYEOF'
-import glob, json, os, re, sys
+import glob, json, os, re, sys, time
 out, lo, hi = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
 n = err = 0
 for f in glob.glob(os.path.join(out, "stage1_*.json")):
     m = re.search(r"stage1_(\d{6})_(\d{6})\.json$", f)
     if not m or int(m.group(1)) < lo or int(m.group(2)) > hi:
         continue
-    try:
-        rs = json.load(open(f))
-    except Exception:
-        continue          # mid-write; counted on the next tick
+    rs = None
+    for _ in range(5):
+        # stage1_v2 rewrites each shard json WHOLE every 8-object window, so a
+        # read can land mid-write. Skipping the file instead would drop its
+        # entire count and make progress appear to go BACKWARDS, which also
+        # corrupts the rate/ETA. Retry until it parses.
+        try:
+            rs = json.load(open(f)); break
+        except Exception:
+            time.sleep(2)
+    if rs is None:
+        continue
     n += len(rs); err += sum(1 for r in rs if r.get("error"))
 print(f"{n} {err}")
 PYEOF
