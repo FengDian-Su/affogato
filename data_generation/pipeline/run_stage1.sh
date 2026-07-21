@@ -19,15 +19,25 @@ OUT=$DG/outputs/stage1/daily_used
 cd "$DG" || exit 1
 mkdir -p "$OUT"
 
+TRIES=${TRIES:-4}
+
 for ((s = START; s < END; s += STEP)); do
   e=$(( s + STEP < END ? s + STEP : END ))
-  f="$OUT/stage1_$(printf '%06d' "$s")_$(printf '%06d' "$e").json"
-  echo "[$(date '+%F %T')] shard [$s:$e] -> $f" | tee -a "$OUT/driver_gpu$GPU.log"
-  GEMMA_BACKEND=vllm LD_LIBRARY_PATH=$HOME/miniconda3/envs/gemma4/lib \
-    "$HOME/miniconda3/envs/gemma4/bin/python" pipeline/stage1_v2.py \
-      --in "$IN" --out "$f" --start "$s" --end "$e" --gpu "$GPU" \
-      --batch_size 8 --max_num_batched_tokens 40960 --gpu_mem 0.90 \
-      >> "$OUT/shard_$(printf '%06d' "$s")_$(printf '%06d' "$e").log" 2>&1 \
-    || echo "[$(date '+%F %T')] SHARD [$s:$e] FAILED rc=$?" | tee -a "$OUT/driver_gpu$GPU.log"
+  tag=$(printf '%06d_%06d' "$s" "$e")
+  f="$OUT/stage1_$tag.json"
+  # Retry the SAME shard rather than moving on: a resumed shard skips the
+  # object_ids already in its json, so a retry is cheap, and the monitor kills a
+  # stalled python expecting this loop to pick it back up. Moving on instead
+  # would silently leave a hole in the range.
+  for ((try = 1; try <= TRIES; try++)); do
+    echo "[$(date '+%F %T')] shard [$s:$e] try $try/$TRIES -> $f" | tee -a "$OUT/driver_gpu$GPU.log"
+    GEMMA_BACKEND=vllm LD_LIBRARY_PATH=$HOME/miniconda3/envs/gemma4/lib \
+      "$HOME/miniconda3/envs/gemma4/bin/python" pipeline/stage1_v2.py \
+        --in "$IN" --out "$f" --start "$s" --end "$e" --gpu "$GPU" \
+        --batch_size 8 --max_num_batched_tokens 40960 --gpu_mem 0.90 \
+        >> "$OUT/shard_$tag.log" 2>&1 && break
+    echo "[$(date '+%F %T')] SHARD [$s:$e] try $try FAILED rc=$?" | tee -a "$OUT/driver_gpu$GPU.log"
+    sleep 60
+  done
 done
 echo "[$(date '+%F %T')] DRIVER DONE gpu$GPU [$START:$END]" | tee -a "$OUT/driver_gpu$GPU.log"
