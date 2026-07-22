@@ -5,13 +5,15 @@
 # process itself has been alive that long — a fresh process is still loading 48GB of weights, which
 # takes ~90s, so a young process is never "stalled"). run_stage1.sh retries the same shard, which
 # resumes from its own json. Exits once the driver logs DRIVER DONE for this range.
+# in_json/out_dir default to daily_used; pass them for any other category.
 set -u
-GPU=${1:?usage: monitor_stage1.sh <gpu> <start> <end> [step]}
+GPU=${1:?usage: monitor_stage1.sh <gpu> <start> <end> [step] [in_json] [out_dir]}
 START=${2:?}; END=${3:?}; STEP=${4:-5000}
 STALL_SEC=2700
 PY=/home/michaellee/miniconda3/envs/mm/bin/python
 DG=/home/michaellee/mclee/affogato/data_generation
-OUT=$DG/outputs/stage1/daily_used
+IN=${5:-outputs/stage0/daily_used/kept_all.json}
+OUT=${6:-$DG/outputs/stage1/daily_used}
 LOG=$OUT/monitor_gpu$GPU.log
 TOTAL=$(( END - START ))
 
@@ -65,7 +67,7 @@ while true; do
 
   if [ "$drv" -eq 0 ]; then
     log "DRIVER DEAD -> restarting [$START:$END] on gpu$GPU"
-    nohup bash "$DG/pipeline/run_stage1.sh" "$GPU" "$START" "$END" "$STEP" >/dev/null 2>&1 &
+    nohup bash "$DG/pipeline/run_stage1.sh" "$GPU" "$START" "$END" "$STEP" "$IN" "$OUT" >/dev/null 2>&1 &
     last_change=$now
   elif [ -n "${py:-}" ] && [ $((now - last_change)) -gt "$STALL_SEC" ]; then
     # only if the process itself is older than the stall window

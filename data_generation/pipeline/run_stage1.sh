@@ -7,15 +7,17 @@
 # one range, and each resumes independently (stage1_v2 skips object_ids already
 # present in its --out file).
 #
-# Usage: run_stage1.sh <gpu> <start> <end> [step=5000]
-#   run_stage1.sh 3 0 28720          # first half
-#   run_stage1.sh 0 28720 57441      # second half, once that gpu frees up
+# Usage: run_stage1.sh <gpu> <start> <end> [step=5000] [in_json] [out_dir]
+#   run_stage1.sh 3 0 28720                                 # daily_used first half
+#   run_stage1.sh 0 28720 57441                             # daily_used second half
+#   run_stage1.sh 3 0 5528 5000 <elec_kept.json> <elec_out># any other category
+# in_json/out_dir default to daily_used so the 3/4-arg callers stay valid.
 set -u
 GPU=$1; START=$2; END=$3; STEP=${4:-5000}
 
 DG=/home/michaellee/mclee/affogato/data_generation
-IN=outputs/stage0/daily_used/kept_all.json
-OUT=$DG/outputs/stage1/daily_used
+IN=${5:-outputs/stage0/daily_used/kept_all.json}
+OUT=${6:-$DG/outputs/stage1/daily_used}
 cd "$DG" || exit 1
 mkdir -p "$OUT"
 
