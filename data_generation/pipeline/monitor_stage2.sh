@@ -49,7 +49,7 @@ while true; do
   if [ "$n" -gt "$last_n" ]; then last_n=$n; last_change=$now; fi
   if [ "$drv" -eq 0 ]; then
     log "DRIVER DEAD -> restarting [$START:$END] on gpu$GPU"
-    nohup bash "$DG/pipeline/run_stage2.sh" "$GPU" "$START" "$END" "$IN" "$MAP" "$OUT" >/dev/null 2>&1 &
+    GPU_MEM="${GPU_MEM:-}" nohup bash "$DG/pipeline/run_stage2.sh" "$GPU" "$START" "$END" "$IN" "$MAP" "$OUT" >/dev/null 2>&1 &
     last_change=$now
   elif [ -n "${py:-}" ] && [ $((now-last_change)) -gt "$STALL_SEC" ]; then
     age=$(( now - $(date -d "$(ps -o lstart= -p "$py")" +%s) ))
