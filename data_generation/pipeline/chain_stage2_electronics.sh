@@ -19,7 +19,7 @@ while true; do
   done=1
   for r in "0 [0:19147]" "1 [19147:38294]" "3 [38294:57441]"; do
     g=${r%% *}; rng=${r#* }
-    grep -q "DRIVER DONE gpu$g $rng" "$DU/driver_gpu$g.log" 2>/dev/null || done=0
+    grep -qF "DRIVER DONE gpu$g $rng" "$DU/driver_gpu$g.log" 2>/dev/null || done=0
   done
   [ "$done" = 1 ] && break
   sleep 300

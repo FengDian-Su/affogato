@@ -1,0 +1,2277 @@
+{
+ "daily_used": {
+  "total": 57441,
+  "completed": 57122,
+  "missing": 319,
+  "objects": [
+   {
+    "index": 1369,
+    "object_id": "09c86c1a262d4c7eb5fe8f4d86e04f4c",
+    "object_name": "Teapot",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/125/635206/00026/00026_nd"
+   },
+   {
+    "index": 1749,
+    "object_id": "551b6f8f0bce4fddb0f750826163525b",
+    "object_name": "Lantern",
+    "n_queries": 6,
+    "reason": "SKIP: only 1 views"
+   },
+   {
+    "index": 1771,
+    "object_id": "d4f5f3a7c2004ec09c47325177d76cd8",
+    "object_name": "Bench",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 2012,
+    "object_id": "73795fddf84a45269970d7c63fd734b1",
+    "object_name": "Soap Dispenser",
+    "n_queries": 5,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 2129,
+    "object_id": "7b323e38cbf1471f932d02b25d81ba30",
+    "object_name": "Salt Shaker",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 2577,
+    "object_id": "d104e7a1f76846fc9d13cead2efd223f",
+    "object_name": "Mug",
+    "n_queries": 5,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 2635,
+    "object_id": "92f2487f29be402abb8cdccf78f3bb76",
+    "object_name": "Flask",
+    "n_queries": 7,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 3346,
+    "object_id": "8fcff5dc0fe146c7b04fe49b5d1dbc6d",
+    "object_name": "Teapot",
+    "n_queries": 5,
+    "reason": "FAILED: UnidentifiedImageError: cannot identify image file '/nfs_drive/gobjaverse/daily-used/101/517811/00038/00"
+   },
+   {
+    "index": 4416,
+    "object_id": "c268b7cb334b4d2a8ccfaad3219603b3",
+    "object_name": "Wok",
+    "n_queries": 5,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 4654,
+    "object_id": "d1fca93c7a734820a6796000364d32eb",
+    "object_name": "Ball",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 4866,
+    "object_id": "b60b557d47194aaea6ec27507c0d4c27",
+    "object_name": "Rain Cloud Glasses",
+    "n_queries": 4,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 4929,
+    "object_id": "25b8fe1131c9405380307fe59ce22f1d",
+    "object_name": "Box",
+    "n_queries": 4,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 5842,
+    "object_id": "3d061dc08d174435a5120f5041cb7be5",
+    "object_name": "Wooden Crate",
+    "n_queries": 0,
+    "reason": "zero stage1 queries"
+   },
+   {
+    "index": 5997,
+    "object_id": "d6ce431adab94621998dae45c27329af",
+    "object_name": "Wooden Box/Cargo Container",
+    "n_queries": 4,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 6571,
+    "object_id": "c03e610cf07e4bfe9e5beb4f13a092f2",
+    "object_name": "Teapot",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/46/243755/00020/00020_nd."
+   },
+   {
+    "index": 6694,
+    "object_id": "c0c73ad01010447ca5e13edb01a146c2",
+    "object_name": "Jump Rope",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/67/348800/00016/00016_nd."
+   },
+   {
+    "index": 6920,
+    "object_id": "462d10bcbce04a91850e82bdec997854",
+    "object_name": "Shovel",
+    "n_queries": 4,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 7345,
+    "object_id": "1ca0bfa1445d46528ed00a9c79651a43",
+    "object_name": "Wicker Basket",
+    "n_queries": 3,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 7635,
+    "object_id": "2237ba9ef40a40af8faba956c369f5bf",
+    "object_name": "Foam Pad",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/72/370696/00018/00018_nd."
+   },
+   {
+    "index": 8405,
+    "object_id": "d233c16594724deea5bca97c8e36d8c1",
+    "object_name": "Film Reel Bookends",
+    "n_queries": 2,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 8585,
+    "object_id": "396bb5ea359b445ca0bc2b1f5b9257a2",
+    "object_name": "Bench",
+    "n_queries": 2,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 8652,
+    "object_id": "5fcce30de3e447dcba22c6d0ad841868",
+    "object_name": "Academic Robe/Doctorate Robe",
+    "n_queries": 7,
+    "reason": "unknown"
+   },
+   {
+    "index": 9808,
+    "object_id": "57deaba9c8f84c88ad9cf655dcb53ddc",
+    "object_name": "Circular Tray",
+    "n_queries": 3,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 10294,
+    "object_id": "c87a47f2d1b542f39cd91bbb88529fbc",
+    "object_name": "Geometric Cushion",
+    "n_queries": 2,
+    "reason": "SKIP: only 1 views"
+   },
+   {
+    "index": 11090,
+    "object_id": "fc39d95241804f11b9861e8a56e58385",
+    "object_name": "Rubber Band",
+    "n_queries": 3,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 11794,
+    "object_id": "8e55448a865940deb958724d0346aacc",
+    "object_name": "Toilet",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/92/472761/00022/00022_nd."
+   },
+   {
+    "index": 12251,
+    "object_id": "8554924e6142498f8b46df1b0e34bfc2",
+    "object_name": "Stand Mixer",
+    "n_queries": 7,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 12609,
+    "object_id": "5feff566f0524190b510bee1f9760321",
+    "object_name": "Box",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 12746,
+    "object_id": "f049ede318cb4c968c53129f6d080b92",
+    "object_name": "Pineapple Ashtray",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/25/139688/00010/00010_nd."
+   },
+   {
+    "index": 13196,
+    "object_id": "8807153e9b31409d997dcc8670404ce5",
+    "object_name": "Santa Claus Cup",
+    "n_queries": 3,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 13334,
+    "object_id": "bc5b322af8894b0baaa204aba34990e0",
+    "object_name": "Cake Stand with Chain",
+    "n_queries": 6,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 13386,
+    "object_id": "01e375567fc9426f8a6426459aeed545",
+    "object_name": "Binoculars",
+    "n_queries": 5,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 13688,
+    "object_id": "ca5ad243982441948501cd5df63a5634",
+    "object_name": "Beach Ball",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/53/278951/00003/00003_nd."
+   },
+   {
+    "index": 13694,
+    "object_id": "bb79bff531c14ce0ad433e459106cd6e",
+    "object_name": "Coffee Table",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/74/383669/00025/00025_nd."
+   },
+   {
+    "index": 13696,
+    "object_id": "de0e92c5df07459c9da81d7ab1231285",
+    "object_name": "Wooden Box/Crate",
+    "n_queries": 8,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 13822,
+    "object_id": "287327aa26194596a1a2d06467a70311",
+    "object_name": "Barrel",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/105/535774/00004/00004_nd"
+   },
+   {
+    "index": 13866,
+    "object_id": "9d1998197613481f92e2cce7212efd6f",
+    "object_name": "Teapot",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/4/33043/00017/00017_nd.ex"
+   },
+   {
+    "index": 14143,
+    "object_id": "314a3d6565994565a7272223bd965348",
+    "object_name": "PlayStation 2 Console",
+    "n_queries": 4,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 14167,
+    "object_id": "9a8a97dab5474e9cb6fd2d8660c7111d",
+    "object_name": "Hook",
+    "n_queries": 4,
+    "reason": "FAILED: UnidentifiedImageError: cannot identify image file '/nfs_drive/gobjaverse/daily-used/85/438064/00028/000"
+   },
+   {
+    "index": 14555,
+    "object_id": "af57904d39954ce09375f94134105ee1",
+    "object_name": "Baby Cradle",
+    "n_queries": 6,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 14618,
+    "object_id": "2527cdd4e465404a9e049171f506fc14",
+    "object_name": "Bottle",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/80/410719/00024/00024_nd."
+   },
+   {
+    "index": 14619,
+    "object_id": "aa4f95de38844582a669397e5901785b",
+    "object_name": "Jug",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/73/378264/00005/00005_nd."
+   },
+   {
+    "index": 14642,
+    "object_id": "9b274f30f55d4de4bf49d69f0b716083",
+    "object_name": "Bottle",
+    "n_queries": 6,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 15091,
+    "object_id": "3039dea506c44acfb7920d135051f4d2",
+    "object_name": "Wheel",
+    "n_queries": 3,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 15229,
+    "object_id": "7a163cb3b229416eb0f48f125726adcb",
+    "object_name": "Pendant Light",
+    "n_queries": 6,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 15239,
+    "object_id": "c1fec553661e4a2c9aec47e1e5eac496",
+    "object_name": "Desk Lamp",
+    "n_queries": 8,
+    "reason": "SKIP: only 1 views"
+   },
+   {
+    "index": 15543,
+    "object_id": "5f03a624defc4596b44e0a09480615be",
+    "object_name": "Cup",
+    "n_queries": 8,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 15571,
+    "object_id": "37f767a9aa4e4228b8896cb75b3f35d2",
+    "object_name": "Teapot",
+    "n_queries": 5,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 15701,
+    "object_id": "6e35d1d4735f499194dac659f6ed0b53",
+    "object_name": "Thermos Flask",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 16051,
+    "object_id": "3421465bb2ff4db3abfdbc4489f79d58",
+    "object_name": "Toilet",
+    "n_queries": 2,
+    "reason": "FAILED: UnidentifiedImageError: cannot identify image file '/nfs_drive/gobjaverse/daily-used/100/511038/00026/00"
+   },
+   {
+    "index": 16055,
+    "object_id": "43e6a5a4378c4efa9cdfbe7176852c55",
+    "object_name": "Flower Pot",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/150/761325/00029/00029_nd"
+   },
+   {
+    "index": 16520,
+    "object_id": "fd9d92b6bbb94e7395d9e22bbd94fd59",
+    "object_name": "Toilet",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/63/329960/00026/00026_nd."
+   },
+   {
+    "index": 16670,
+    "object_id": "2b5b98f5dfea49019ad523947f474141",
+    "object_name": "Shirt",
+    "n_queries": 7,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 16991,
+    "object_id": "a2bc09040d3a4f67ad45e8cc252c873f",
+    "object_name": "Knife",
+    "n_queries": 3,
+    "reason": "FAILED: UnidentifiedImageError: cannot identify image file '/nfs_drive/gobjaverse/daily-used/33/178196/00029/000"
+   },
+   {
+    "index": 17254,
+    "object_id": "69bdb56fc4dc46eaa7a3255a7a7dd6eb",
+    "object_name": "wedge",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/47/247050/00006/00006_nd."
+   },
+   {
+    "index": 17463,
+    "object_id": "3d7e6c11223043139b462b64dd3ac553",
+    "object_name": "Foldable Water Bottle",
+    "n_queries": 6,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 17807,
+    "object_id": "e5262dbc050a44869ff8b37f03496c4c",
+    "object_name": "Vase",
+    "n_queries": 3,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 17845,
+    "object_id": "e8f53423b0554cf0aebf71c696562c25",
+    "object_name": "Military Ammo Can",
+    "n_queries": 6,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 17897,
+    "object_id": "de2e9e84e52844a0ab522e5e98202453",
+    "object_name": "Pliers",
+    "n_queries": 0,
+    "reason": "zero stage1 queries"
+   },
+   {
+    "index": 17911,
+    "object_id": "527a18127dc042c8a8266d6c45366a43",
+    "object_name": "Mortar and Pestle",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/105/536613/00004/00004_nd"
+   },
+   {
+    "index": 18079,
+    "object_id": "d6f092ca445c457095ce9378a5e7042f",
+    "object_name": "Radiator",
+    "n_queries": 3,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 18420,
+    "object_id": "47ece6a0dc1d4ae7be9dbb76bd04d154",
+    "object_name": "Pump",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/15/86440/00025/00025_nd.e"
+   },
+   {
+    "index": 18594,
+    "object_id": "e322c1e51c334119ae1c270b5ad0988a",
+    "object_name": "Zafu",
+    "n_queries": 6,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 18866,
+    "object_id": "e51a61cccfe543d09dd52b68b6f5e8d5",
+    "object_name": "Orange",
+    "n_queries": 4,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 18874,
+    "object_id": "10f461104c924a569ef806df7676894e",
+    "object_name": "Lamp Stand",
+    "n_queries": 2,
+    "reason": "FAILED: UnidentifiedImageError: cannot identify image file '/nfs_drive/gobjaverse/daily-used/132/670317/00039/00"
+   },
+   {
+    "index": 18875,
+    "object_id": "7d31a8d461ce451cadf0fc81d7a0aeae",
+    "object_name": "Gramophone",
+    "n_queries": 5,
+    "reason": "FAILED: UnidentifiedImageError: cannot identify image file '/nfs_drive/gobjaverse/daily-used/81/417400/00034/000"
+   },
+   {
+    "index": 18885,
+    "object_id": "d6e252ca05dc48ce9309aaa5365c7ec5",
+    "object_name": "Pot",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/119/609215/00030/00030_nd"
+   },
+   {
+    "index": 19356,
+    "object_id": "bbbe01ef91b84357891a648a821cc034",
+    "object_name": "Potion Bottle",
+    "n_queries": 8,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 19627,
+    "object_id": "e70b46a54b9e434589c843dca18d846d",
+    "object_name": "Bucket",
+    "n_queries": 5,
+    "reason": "SKIP: only 1 views"
+   },
+   {
+    "index": 19709,
+    "object_id": "cb24013fb0a6415b8a6b457cbb3c608a",
+    "object_name": "Pliers",
+    "n_queries": 0,
+    "reason": "zero stage1 queries"
+   },
+   {
+    "index": 19727,
+    "object_id": "77db12d188504505a9209de1bef076ab",
+    "object_name": "Pliers",
+    "n_queries": 0,
+    "reason": "zero stage1 queries"
+   },
+   {
+    "index": 19832,
+    "object_id": "afd4d3b8bf934da7937b575cce68cd04",
+    "object_name": "Paint Tray with Brushes",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/41/218513/00035/00035_nd."
+   },
+   {
+    "index": 19843,
+    "object_id": "7b876b5064c94db686efc0e524b79b41",
+    "object_name": "Tower of Blocks",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 19848,
+    "object_id": "adf229c426194740ab0ec9cdb00262b4",
+    "object_name": "Ladder",
+    "n_queries": 3,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 19897,
+    "object_id": "7c1a2b805efd4edd8625839f00b17a7f",
+    "object_name": "Hexagonal Cushion",
+    "n_queries": 4,
+    "reason": "FAILED: UnidentifiedImageError: cannot identify image file '/nfs_drive/gobjaverse/daily-used/58/302447/00008/000"
+   },
+   {
+    "index": 20116,
+    "object_id": "7ed0516cba434c8ca230f6d9645ff0f3",
+    "object_name": "Ukulele",
+    "n_queries": 5,
+    "reason": "FAILED: UnidentifiedImageError: cannot identify image file '/nfs_drive/gobjaverse/daily-used/48/252462/00018/000"
+   },
+   {
+    "index": 20141,
+    "object_id": "ddbaeba9f80f44e488b061856f415586",
+    "object_name": "Vase",
+    "n_queries": 3,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 20319,
+    "object_id": "1b0729d96c81430083035cde7525ce64",
+    "object_name": "Barrel",
+    "n_queries": 5,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 20326,
+    "object_id": "156a09f96e794e3aa7c3d85ee3a0c5d8",
+    "object_name": "Retro Radio",
+    "n_queries": 8,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 20473,
+    "object_id": "3386cee12f9e427a8b8e6a383083ead4",
+    "object_name": "Teapot",
+    "n_queries": 4,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 20495,
+    "object_id": "ea7d80817e76480a9e727c04cd26a859",
+    "object_name": "Pegboard",
+    "n_queries": 3,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 20888,
+    "object_id": "fffdfc4c792541ed8a0c8646979d18dd",
+    "object_name": "Bench",
+    "n_queries": 6,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 20952,
+    "object_id": "79d0570735d0466585bb65f30f6cf3e3",
+    "object_name": "Wooden Block",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/117/597416/00004/00004_nd"
+   },
+   {
+    "index": 21124,
+    "object_id": "77d95c70624a4ed8b35a06ba63175427",
+    "object_name": "Pomegranate",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/134/682285/00030/00030_nd"
+   },
+   {
+    "index": 21250,
+    "object_id": "01a99c1d0fe14651bda93d2ed9c930eb",
+    "object_name": "Toilet Paper Holder",
+    "n_queries": 3,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 21288,
+    "object_id": "58ead71b64f249dcbc2b7d09ba8dfc72",
+    "object_name": "Clothes Hanger",
+    "n_queries": 3,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 21289,
+    "object_id": "015b72017dd84f86939a978cf5da3948",
+    "object_name": "Faucet",
+    "n_queries": 7,
+    "reason": "SKIP: only 1 views"
+   },
+   {
+    "index": 21797,
+    "object_id": "565f03a716904925b4c9821da416b0b4",
+    "object_name": "Water Gun",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/138/701658/00027/00027_nd"
+   },
+   {
+    "index": 22296,
+    "object_id": "2a13f96309d44bda96d0a8e380f26e62",
+    "object_name": "Chest",
+    "n_queries": 7,
+    "reason": "FAILED: UnidentifiedImageError: cannot identify image file '/nfs_drive/gobjaverse/daily-used/67/345851/00005/000"
+   },
+   {
+    "index": 22297,
+    "object_id": "bc9a6b47c49e4636abd244b851741d0c",
+    "object_name": "Pallet",
+    "n_queries": 2,
+    "reason": "FAILED: UnidentifiedImageError: cannot identify image file '/nfs_drive/gobjaverse/daily-used/68/353671/00005/000"
+   },
+   {
+    "index": 22537,
+    "object_id": "2787b36afda5408fbbc9520e9562b768",
+    "object_name": "Scissors",
+    "n_queries": 0,
+    "reason": "zero stage1 queries"
+   },
+   {
+    "index": 22603,
+    "object_id": "e13e0240e9d14b2fb9de5d95c5370924",
+    "object_name": "Spinning Toy",
+    "n_queries": 5,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 22816,
+    "object_id": "15eadd06662d4650a6c151a30bab863f",
+    "object_name": "Chair",
+    "n_queries": 2,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 23319,
+    "object_id": "9b367fed57aa46bc9d2414ad8d88f07d",
+    "object_name": "Bench",
+    "n_queries": 2,
+    "reason": "FAILED: UnidentifiedImageError: cannot identify image file '/nfs_drive/gobjaverse/daily-used/0/13425/00029/00029"
+   },
+   {
+    "index": 23499,
+    "object_id": "d331862033ef40d1ad44fe12ab8edf86",
+    "object_name": "Coffin",
+    "n_queries": 4,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 23699,
+    "object_id": "b3eb949fc4184ee698a768db932643bb",
+    "object_name": "Pillow",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/88/453501/00038/00038_nd."
+   },
+   {
+    "index": 23827,
+    "object_id": "eab30de859a440ceab8b1ec2ead4fd92",
+    "object_name": "Bell",
+    "n_queries": 3,
+    "reason": "FAILED: UnidentifiedImageError: cannot identify image file '/nfs_drive/gobjaverse/daily-used/102/524544/00025/00"
+   },
+   {
+    "index": 24031,
+    "object_id": "231a76f1ce2043ceb835ad1b691df82f",
+    "object_name": "Pliers",
+    "n_queries": 0,
+    "reason": "zero stage1 queries"
+   },
+   {
+    "index": 24125,
+    "object_id": "3261813d1beb4e7a904d7f86bf299e35",
+    "object_name": "Pot",
+    "n_queries": 3,
+    "reason": "FAILED: UnidentifiedImageError: cannot identify image file '/nfs_drive/gobjaverse/daily-used/13/75969/00004/0000"
+   },
+   {
+    "index": 24355,
+    "object_id": "834bdbd0968a4050ba33544e7c79f9fd",
+    "object_name": "Tile",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 24357,
+    "object_id": "cde8b45c57094169a387f59a02a9cf85",
+    "object_name": "Propane Tank",
+    "n_queries": 7,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 24854,
+    "object_id": "fe998a1a91f848388d73541b2ad8de0f",
+    "object_name": "Box",
+    "n_queries": 3,
+    "reason": "FAILED: UnidentifiedImageError: cannot identify image file '/nfs_drive/gobjaverse/daily-used/147/749975/00033/00"
+   },
+   {
+    "index": 24875,
+    "object_id": "6f4bf11b02f5414f88409896c85966b0",
+    "object_name": "Dumbek (Middle Eastern Drum)",
+    "n_queries": 3,
+    "reason": "unknown"
+   },
+   {
+    "index": 24923,
+    "object_id": "bc40f4be11054fab82bd16f7978e4f4d",
+    "object_name": "Chair",
+    "n_queries": 2,
+    "reason": "FAILED: UnidentifiedImageError: cannot identify image file '/nfs_drive/gobjaverse/daily-used/76/393636/00038/000"
+   },
+   {
+    "index": 25360,
+    "object_id": "b6f3b765cacb4705b5fa1fc0ff0cbbfa",
+    "object_name": "Coca-Cola Vending Machine",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 25363,
+    "object_id": "943cbc7619774ba4a5bb838d2ba5c40c",
+    "object_name": "Knife",
+    "n_queries": 3,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 25873,
+    "object_id": "2f1e9869b8c7466f855401cff596291d",
+    "object_name": "Desk Lamp",
+    "n_queries": 4,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 25874,
+    "object_id": "45953abdc1f444589f5558b12ebb6ca8",
+    "object_name": "Subwoofer",
+    "n_queries": 4,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 25889,
+    "object_id": "1e95368b6ae249aba5ce1bcdc8bc0a29",
+    "object_name": "Laundry Detergent Bottle",
+    "n_queries": 7,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/116/590572/00009/00009_nd"
+   },
+   {
+    "index": 26372,
+    "object_id": "0c4c3245edb14e86a20ed84b7cc69ff1",
+    "object_name": "Ladder",
+    "n_queries": 2,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 26799,
+    "object_id": "1e06fef6f90c4b35ac5233247c077310",
+    "object_name": "Ottoman",
+    "n_queries": 6,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 26904,
+    "object_id": "b43e25f3f8ab4e7c9b3ac3850b684172",
+    "object_name": "Pitcher",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 26999,
+    "object_id": "28b6953caf7e4c66858980cb213a1d83",
+    "object_name": "Toilet",
+    "n_queries": 4,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 27422,
+    "object_id": "253b3ec67afe46e2a1377726507475ca",
+    "object_name": "Toy Ball",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/148/750691/00004/00004_nd"
+   },
+   {
+    "index": 27677,
+    "object_id": "4442385d7a244ff9a69a93764460c3a4",
+    "object_name": "Gaming Controller",
+    "n_queries": 7,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/99/506283/00036/00036_nd."
+   },
+   {
+    "index": 27850,
+    "object_id": "9ffd653e0c8940af9495db99ce102963",
+    "object_name": "Warning Sign",
+    "n_queries": 2,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 27867,
+    "object_id": "a771dd00286343ed8e36fddcc740434f",
+    "object_name": "Mug",
+    "n_queries": 2,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 27878,
+    "object_id": "93974967271e4c4db08efec0023d06bc",
+    "object_name": "Woven Basket",
+    "n_queries": 2,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 28101,
+    "object_id": "6b5bee3eee08442eb1d93552e4901855",
+    "object_name": "Barrel",
+    "n_queries": 7,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/96/492084/00019/00019_nd."
+   },
+   {
+    "index": 28157,
+    "object_id": "dadd0e99ea2b4d8b8d31773dd404ea2d",
+    "object_name": "Toilet",
+    "n_queries": 7,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 28169,
+    "object_id": "c6fe6e3bfa674b15a16f08b8defb1866",
+    "object_name": "Teapot",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 28261,
+    "object_id": "3d74e4e0811040619ed953d39c233f8a",
+    "object_name": "Lantern",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/96/491188/00037/00037_nd."
+   },
+   {
+    "index": 28278,
+    "object_id": "c0f6460b53bc45be9f05185e1e90fafe",
+    "object_name": "Bowl",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/147/748755/00031/00031_nd"
+   },
+   {
+    "index": 28328,
+    "object_id": "d6ab2f9a5dbf4ab8990de26325c9eb3a",
+    "object_name": "Pillow",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 28338,
+    "object_id": "c2b93ceec68d428292a8e8dbf98f32b4",
+    "object_name": "Faucet Valve",
+    "n_queries": 7,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 28499,
+    "object_id": "767d9ea35f174716a273ae9bd957f54c",
+    "object_name": "Door",
+    "n_queries": 4,
+    "reason": "SKIP: only 1 views"
+   },
+   {
+    "index": 29011,
+    "object_id": "bd880615d13b4a07aac1b189feadf361",
+    "object_name": "Bucket",
+    "n_queries": 5,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 29037,
+    "object_id": "3892fdf2fefb48a2b5e2c1215a2cddda",
+    "object_name": "Umbrella",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/16/91036/00006/00006_nd.e"
+   },
+   {
+    "index": 29043,
+    "object_id": "ee3c8c54960c44f18e2ffc4a353451d2",
+    "object_name": "Motorcycle Helmet",
+    "n_queries": 5,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 29044,
+    "object_id": "81b740ef24c344f1a3690ea9aae28dd3",
+    "object_name": "Couch",
+    "n_queries": 1,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/157/797569/00029/00029_nd"
+   },
+   {
+    "index": 29045,
+    "object_id": "dd09d6032f674d43882f1bfe42d6813d",
+    "object_name": "Wall Clock",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/52/274332/00013/00013_nd."
+   },
+   {
+    "index": 29052,
+    "object_id": "b210028df73b4df5a1eae8102f9c0cfc",
+    "object_name": "Globe",
+    "n_queries": 3,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 29075,
+    "object_id": "9790c0f17bcc4eba95a7bf94088a0f5a",
+    "object_name": "Pot",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 29472,
+    "object_id": "6b7bbc12aecb4a1aac8a00c09381333b",
+    "object_name": "Cube",
+    "n_queries": 1,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/134/682061/00007/00007_nd"
+   },
+   {
+    "index": 29562,
+    "object_id": "b7430060f454470eb8849de55747d21b",
+    "object_name": "Bench",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/146/743564/00031/00031_nd"
+   },
+   {
+    "index": 29563,
+    "object_id": "7c98e9f0a8c24add9df60f7b8f3620b6",
+    "object_name": "Cup and Stand",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 29571,
+    "object_id": "cfaca844db904bb7ae63c1628aa48856",
+    "object_name": "Gas Cylinder",
+    "n_queries": 7,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 29579,
+    "object_id": "8289563cd2d94521bb915a1d1271a086",
+    "object_name": "Recessed LED Light Fixture",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/99/507538/00026/00026_nd."
+   },
+   {
+    "index": 29599,
+    "object_id": "0b1179e852a14886b45f4ccaab0760ca",
+    "object_name": "Bowl",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/115/585198/00005/00005_nd"
+   },
+   {
+    "index": 29995,
+    "object_id": "6a327620788e47c98384d0f6a178cd73",
+    "object_name": "Speakers and Cubes",
+    "n_queries": 0,
+    "reason": "zero stage1 queries"
+   },
+   {
+    "index": 30038,
+    "object_id": "3643d319e19e4e02bc9537e838f63e2e",
+    "object_name": "Wooden Block",
+    "n_queries": 3,
+    "reason": "SKIP: only 1 views"
+   },
+   {
+    "index": 30094,
+    "object_id": "713ea5333f2344a6ae4bdde0c01b2879",
+    "object_name": "Paper Airplane",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/11/67162/00011/00011_nd.e"
+   },
+   {
+    "index": 30205,
+    "object_id": "2ccac0eaa9b14b059be313dc079433eb",
+    "object_name": "Wooden crate",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/45/235920/00009/00009_nd."
+   },
+   {
+    "index": 30225,
+    "object_id": "b2eda159553340cc92b03d9771707d77",
+    "object_name": "Wooden Bookcase",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/116/593429/00027/00027_nd"
+   },
+   {
+    "index": 30555,
+    "object_id": "cde8a1bca5af4e77ab236935f3020a83",
+    "object_name": "Flower Pot",
+    "n_queries": 2,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 30599,
+    "object_id": "0850ce9786084be49784f6334a2cb20f",
+    "object_name": "Stool",
+    "n_queries": 1,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 30630,
+    "object_id": "707f1b6565e340f98efd940ea396cd96",
+    "object_name": "Shelf Bracket",
+    "n_queries": 3,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 30906,
+    "object_id": "92d4fb3db7b04c4da0e21bb73aa1f334",
+    "object_name": "Car Wheel",
+    "n_queries": 3,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 31115,
+    "object_id": "6edc341457e44603ab351470ab800493",
+    "object_name": "Cloth",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 31121,
+    "object_id": "1ae85c09d69f46eebc010b1899fb39b6",
+    "object_name": "Sneakers",
+    "n_queries": 7,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 31126,
+    "object_id": "1f10445cdd0c426e974b395bbb3a2180",
+    "object_name": "Bag",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 31139,
+    "object_id": "1583ea0722844476985d0fc5dde75639",
+    "object_name": "Avocado",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 31154,
+    "object_id": "5263eaaaed8041ef8413746306284bb8",
+    "object_name": "T-shirt",
+    "n_queries": 9,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 31381,
+    "object_id": "1e1f42e30e6342a088ad120e85843ded",
+    "object_name": "Storage Box with Shelf",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/107/545594/00022/00022_nd"
+   },
+   {
+    "index": 31411,
+    "object_id": "5bf08f50ade34087852a6ce652b978e6",
+    "object_name": "Peppers (specifically, a collection of different types of peppers)",
+    "n_queries": 2,
+    "reason": "unknown"
+   },
+   {
+    "index": 31622,
+    "object_id": "526aa7104d074b78858be0d077005fdf",
+    "object_name": "Teapot",
+    "n_queries": 5,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 31684,
+    "object_id": "f1643f1398a14fe7a5418e4e307f52bf",
+    "object_name": "Knife",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/103/529697/00001/00001_nd"
+   },
+   {
+    "index": 31781,
+    "object_id": "d66023830bda458384d72ee201379185",
+    "object_name": "Potato",
+    "n_queries": 1,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/146/744221/00022/00022_nd"
+   },
+   {
+    "index": 32196,
+    "object_id": "92d4e5361c6447bea1f3033f3b7a1407",
+    "object_name": "Book",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 32241,
+    "object_id": "f6570b456167489799e14c408712e5de",
+    "object_name": "Bench",
+    "n_queries": 2,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 32361,
+    "object_id": "d084a6f810274e7e9390f4f65dd9db65",
+    "object_name": "Vase",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 32530,
+    "object_id": "517908b5f65a43e4acc57d3efd94d955",
+    "object_name": "Coffin",
+    "n_queries": 7,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 32760,
+    "object_id": "ec328123eb724430a31298f55a3c8e1b",
+    "object_name": "Chair",
+    "n_queries": 3,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 32770,
+    "object_id": "9b24c5e2eee24eb7a1d0386f22a26350",
+    "object_name": "Keyboard",
+    "n_queries": 5,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 32771,
+    "object_id": "54fe44d17c1149a2b808af4217c37798",
+    "object_name": "Armchair",
+    "n_queries": 2,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 32876,
+    "object_id": "cdafb55b36b04b339a795a749675a108",
+    "object_name": "Stone Block",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/9/59003/00013/00013_nd.ex"
+   },
+   {
+    "index": 33027,
+    "object_id": "81b838519bd7420fa59a4c51b949ec78",
+    "object_name": "Handgun",
+    "n_queries": 6,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 33206,
+    "object_id": "23b9e3f8fb6e463a987c191a77822ae1",
+    "object_name": "Horn",
+    "n_queries": 6,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 33234,
+    "object_id": "e3626b9cc5a4480a8e54439b221c53f7",
+    "object_name": "Portable Toilet",
+    "n_queries": 6,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 33246,
+    "object_id": "7bdb028ee24e473c9c44f0aefdf1641e",
+    "object_name": "Tool Chest",
+    "n_queries": 7,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/79/407404/00009/00009_nd."
+   },
+   {
+    "index": 33249,
+    "object_id": "28588749b63b43629227ef4534080066",
+    "object_name": "Barrel",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 33250,
+    "object_id": "050c1051411849939028f6e6a510d18a",
+    "object_name": "Coffee Cup",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 33283,
+    "object_id": "9cf21d7502914e3cb9ff2f1451b03c92",
+    "object_name": "Piano",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/49/258073/00012/00012_nd."
+   },
+   {
+    "index": 33315,
+    "object_id": "057589dce19147cba5ed0ad4ad09212d",
+    "object_name": "Woven Basket",
+    "n_queries": 3,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 33532,
+    "object_id": "758528909d7d4516857ff4a15d91b760",
+    "object_name": "Box",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/84/432283/00019/00019_nd."
+   },
+   {
+    "index": 33563,
+    "object_id": "4d16e0c8797449a4bff5af78b9966277",
+    "object_name": "Ceiling Lamp",
+    "n_queries": 0,
+    "reason": "zero stage1 queries"
+   },
+   {
+    "index": 33747,
+    "object_id": "ded0b94b831142eb9f288e7b321b344e",
+    "object_name": "Mug",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 33749,
+    "object_id": "c401e8ebc4b9411984e46f0775d46f4f",
+    "object_name": "Table",
+    "n_queries": 2,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/12/73836/00016/00016_nd.e"
+   },
+   {
+    "index": 33773,
+    "object_id": "2a12987c827f4aeca924652f488b67d3",
+    "object_name": "Child Swing Set",
+    "n_queries": 8,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/36/190824/00001/00001_nd."
+   },
+   {
+    "index": 33783,
+    "object_id": "2faf0a30b1614a9ba029def4e63270d0",
+    "object_name": "Wooden Blocks",
+    "n_queries": 7,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/107/545954/00009/00009_nd"
+   },
+   {
+    "index": 34286,
+    "object_id": "069d9e50417d45c8a81880d6f69a76b3",
+    "object_name": "Shotgun",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/79/405141/00011/00011_nd."
+   },
+   {
+    "index": 34293,
+    "object_id": "e8b75e876523480ca92cf297cf108032",
+    "object_name": "Bench",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/109/559541/00006/00006_nd"
+   },
+   {
+    "index": 34297,
+    "object_id": "22bee2fe7b8044a98fd764c4f5e469ef",
+    "object_name": "Cat Tree",
+    "n_queries": 2,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/127/645674/00028/00028_nd"
+   },
+   {
+    "index": 34334,
+    "object_id": "85258bd0f52545759da91d71f57cb330",
+    "object_name": "Wine Glass",
+    "n_queries": 4,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 34460,
+    "object_id": "12171f60349f42e79ade6c663d726768",
+    "object_name": "Gas Mask",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/67/345351/00011/00011_nd."
+   },
+   {
+    "index": 34463,
+    "object_id": "c9ed593f8752403396734c06f3fb1425",
+    "object_name": "Barrel",
+    "n_queries": 6,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 34617,
+    "object_id": "dbc5c583f45440f2af288946e8684627",
+    "object_name": "Book",
+    "n_queries": 8,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 34791,
+    "object_id": "48cbcd359859453ca021769696969685",
+    "object_name": "Pot",
+    "n_queries": 3,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 34819,
+    "object_id": "fe191919c0f34c318536aa1d3a3a794b",
+    "object_name": "Barrel",
+    "n_queries": 4,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 34827,
+    "object_id": "f4336c9ac9ab412fb64313f5a474092f",
+    "object_name": "Book",
+    "n_queries": 6,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 34834,
+    "object_id": "0e794644303d4962b107d7f84ca42c45",
+    "object_name": "Wooden Box",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 34835,
+    "object_id": "ea41830b806f41b8b685f2b95dfdb234",
+    "object_name": "Cylinder",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 34836,
+    "object_id": "ada81c91409246d0bc0bb440b19f26cd",
+    "object_name": "Teapot",
+    "n_queries": 4,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 34837,
+    "object_id": "9c388eec6fa04ea28dd2e9778284c83e",
+    "object_name": "Wooden Blocks",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/155/788029/00027/00027_nd"
+   },
+   {
+    "index": 34841,
+    "object_id": "d38b5bdee5ba49419210aad45a48f14d",
+    "object_name": "Video Camera",
+    "n_queries": 8,
+    "reason": "SKIP: only 1 views"
+   },
+   {
+    "index": 34901,
+    "object_id": "eb1d534bd67640a4b98e38faa12cb003",
+    "object_name": "Bench",
+    "n_queries": 2,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/54/284599/00025/00025_nd."
+   },
+   {
+    "index": 35141,
+    "object_id": "c9697081f2c2495fbb8313659e1cc9cd",
+    "object_name": "Barrel",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 35337,
+    "object_id": "974a43b272794c56b3a6e264a94024b5",
+    "object_name": "Gas Mask",
+    "n_queries": 7,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/128/652971/00011/00011_nd"
+   },
+   {
+    "index": 35348,
+    "object_id": "4959971dc77a44798c897a28f457856e",
+    "object_name": "Bottle",
+    "n_queries": 5,
+    "reason": "SKIP: only 1 views"
+   },
+   {
+    "index": 35499,
+    "object_id": "c3608d06da7b4896a3297e0da7e69895",
+    "object_name": "Pot",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 35796,
+    "object_id": "1dc707d64fe34d90b1b17f507f8b35f1",
+    "object_name": "Jug",
+    "n_queries": 4,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 35821,
+    "object_id": "48e124b28cc34a8a8ea973dd19e344ec",
+    "object_name": "Lantern",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/97/496423/00007/00007_nd."
+   },
+   {
+    "index": 35863,
+    "object_id": "72229a0dad03449a8c2fd02a15ee07a0",
+    "object_name": "Wooden Box/Chest",
+    "n_queries": 6,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 36088,
+    "object_id": "c4c686361ba644fa9b10cef3461cc7b7",
+    "object_name": "Lantern",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/49/258891/00018/00018_nd."
+   },
+   {
+    "index": 36311,
+    "object_id": "bc03a2ac7bd44cc98d500d1380c2d67f",
+    "object_name": "Shelving Unit",
+    "n_queries": 2,
+    "reason": "SKIP: only 1 views"
+   },
+   {
+    "index": 36327,
+    "object_id": "ad2b9b0cee594673be81ec92235f010d",
+    "object_name": "Birdcage",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 36337,
+    "object_id": "6225c373683942a5b2e996231d1e26fc",
+    "object_name": "Fire Extinguisher",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 36340,
+    "object_id": "cbd2f3ba44d84136b8b23af67ea779d7",
+    "object_name": "Folding Table",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 36343,
+    "object_id": "dad21e4ae69e487cbc4cdac19a2695f6",
+    "object_name": "Plastic Ring with a Connector",
+    "n_queries": 2,
+    "reason": "unknown"
+   },
+   {
+    "index": 36344,
+    "object_id": "742fbdd5bf314a488494a4afdba92b25",
+    "object_name": "Bookshelf with Ladder",
+    "n_queries": 4,
+    "reason": "SKIP: only 1 views"
+   },
+   {
+    "index": 36846,
+    "object_id": "b929b766c3794ae7ba05426cba609038",
+    "object_name": "Gaming Chest/Storage Box",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 36852,
+    "object_id": "555015c91e54400bbbbc53a5cbe97a5e",
+    "object_name": "Bowl",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/43/226634/00022/00022_nd."
+   },
+   {
+    "index": 36853,
+    "object_id": "5a4be383a62c4237b0eadb82f1ec9f8a",
+    "object_name": "Hiking Boot",
+    "n_queries": 7,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/127/646688/00038/00038_nd"
+   },
+   {
+    "index": 36855,
+    "object_id": "3057a15a0c9242b881b85624e15fb0f7",
+    "object_name": "Coffin",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/55/285920/00015/00015_nd."
+   },
+   {
+    "index": 36880,
+    "object_id": "0ed32abaa82446e991101e719b9e01c0",
+    "object_name": "Wedge",
+    "n_queries": 3,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 37395,
+    "object_id": "ef1e1fa8247440fcaca20bea9d8fcd6f",
+    "object_name": "PVC Pipe Fittings",
+    "n_queries": 1,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 37430,
+    "object_id": "3aea9e1f9c664652856aa7fb06c49d0a",
+    "object_name": "Chest of Drawers",
+    "n_queries": 8,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 37555,
+    "object_id": "a0b900d9de78485bad2534a88e2c19c4",
+    "object_name": "Basket",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/54/283198/00024/00024_nd."
+   },
+   {
+    "index": 37558,
+    "object_id": "b395cfeedb86480badc1d4ae72132bac",
+    "object_name": "Box",
+    "n_queries": 1,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 37808,
+    "object_id": "29538851b71c43538a01f310f185c134",
+    "object_name": "Baby Throne",
+    "n_queries": 0,
+    "reason": "zero stage1 queries"
+   },
+   {
+    "index": 37891,
+    "object_id": "7ece1ee1b602436dbcfb77e4f58ba8e5",
+    "object_name": "Folding Step Ladder",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 37897,
+    "object_id": "1a53662e300b4d7e9ae39eba101409ea",
+    "object_name": "Gift Box",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/99/505474/00019/00019_nd."
+   },
+   {
+    "index": 37934,
+    "object_id": "01ab0c36db1a46bbabf1ee788ae3fa78",
+    "object_name": "Pipe Bracket",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/76/390023/00028/00028_nd."
+   },
+   {
+    "index": 38228,
+    "object_id": "db65389293a447319dc98094b52e200c",
+    "object_name": "Inflatable Float",
+    "n_queries": 4,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 38419,
+    "object_id": "40138a9df7bc4bd08faf229c6547ca94",
+    "object_name": "Brick",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/94/481312/00020/00020_nd."
+   },
+   {
+    "index": 38445,
+    "object_id": "7351366cae2a4361aa3318f9d2fcb03a",
+    "object_name": "Vintage Telephone",
+    "n_queries": 7,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 38676,
+    "object_id": "bb9bfd3a8f6b4c7daa963999127e321e",
+    "object_name": "Cube",
+    "n_queries": 1,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 38684,
+    "object_id": "21ab105eec02496381bffb7689ac7b50",
+    "object_name": "Lantern",
+    "n_queries": 2,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 38905,
+    "object_id": "7d09731cf6a541729176d93ac514dbd4",
+    "object_name": "Teapot",
+    "n_queries": 4,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 38909,
+    "object_id": "b3245669333148ae9683b6b3aa4d66f0",
+    "object_name": "Barrel",
+    "n_queries": 4,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 38941,
+    "object_id": "73c023c90f8d45fb88294bccade836c0",
+    "object_name": "Alarm Clock",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 38951,
+    "object_id": "c36e2fe373e0421aa08565589d5d019f",
+    "object_name": "I-beam",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/104/533797/00023/00023_nd"
+   },
+   {
+    "index": 39019,
+    "object_id": "467682aa13124827ad62291603c1b40b",
+    "object_name": "Molotov Cocktail",
+    "n_queries": 2,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/92/471371/00003/00003_nd."
+   },
+   {
+    "index": 39066,
+    "object_id": "cc5b64696ea14950b610c31bb70bb480",
+    "object_name": "Scissors",
+    "n_queries": 0,
+    "reason": "zero stage1 queries"
+   },
+   {
+    "index": 39241,
+    "object_id": "bfafc20f83534fcd859174977ce1b144",
+    "object_name": "Pillow",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/153/778720/00036/00036_nd"
+   },
+   {
+    "index": 39276,
+    "object_id": "b5b06c50dcc2474492487e753c070eaa",
+    "object_name": "Toilet Seat",
+    "n_queries": 2,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 39358,
+    "object_id": "1b3372c1616b4090b6297261d667f8bb",
+    "object_name": "Fireplace",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/75/385509/00014/00014_nd."
+   },
+   {
+    "index": 39423,
+    "object_id": "86b3b05dc1c64e009a5ecb0afbe23c86",
+    "object_name": "Pet Bed",
+    "n_queries": 5,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 39440,
+    "object_id": "761073a6cefe4a9cad41729b9338d4af",
+    "object_name": "Bench",
+    "n_queries": 2,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 39446,
+    "object_id": "efc971c1e966434d803e733bc2f679a1",
+    "object_name": "Hydrogen Tank",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/87/449690/00008/00008_nd."
+   },
+   {
+    "index": 39455,
+    "object_id": "b35f7c888a5349c9bcdac9296051a0cb",
+    "object_name": "Cup",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/71/368500/00027/00027_nd."
+   },
+   {
+    "index": 39975,
+    "object_id": "9b9bd9a1aeb94a2fa131592bf5735c48",
+    "object_name": "Brick",
+    "n_queries": 3,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 40007,
+    "object_id": "e6223e28dc674f45b2ee8dfbed3a0e71",
+    "object_name": "Vase",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 40039,
+    "object_id": "9dcf40787f55407b83c339e57d6bf1e4",
+    "object_name": "Liquid Dispenser",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/72/373127/00000/00000_nd."
+   },
+   {
+    "index": 40040,
+    "object_id": "bd2ace090dfb44629d90286aaa1c1592",
+    "object_name": "Ship's Wheel",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/14/83678/00004/00004_nd.e"
+   },
+   {
+    "index": 40293,
+    "object_id": "370d82fe0f52453ba37679cac4c52328",
+    "object_name": "Bench",
+    "n_queries": 1,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 40438,
+    "object_id": "bf4b6dbf03f94ecabd7f76bcde0adf4c",
+    "object_name": "Hair Dryer",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/113/578730/00032/00032_nd"
+   },
+   {
+    "index": 40494,
+    "object_id": "e5a3f5168b354a269e51a483b056889a",
+    "object_name": "Vase",
+    "n_queries": 3,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 40523,
+    "object_id": "d1f20f613c3c481299203724241ae58c",
+    "object_name": "Shelf",
+    "n_queries": 2,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 40675,
+    "object_id": "4446eb3ef6b5463c8cb4f567d7071bf5",
+    "object_name": "Table",
+    "n_queries": 2,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 40949,
+    "object_id": "1906751ecff845f8b989fd5f64d70c3c",
+    "object_name": "Barrel",
+    "n_queries": 5,
+    "reason": "SKIP: only 1 views"
+   },
+   {
+    "index": 41009,
+    "object_id": "50b74e19485345f383c7eea0b49582fc",
+    "object_name": "Fire Extinguisher",
+    "n_queries": 7,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 41035,
+    "object_id": "640599a1c5fc40988e2470b33b1b1390",
+    "object_name": "Alarm Clock",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/32/171942/00038/00038_nd."
+   },
+   {
+    "index": 41039,
+    "object_id": "f672ab138b784223965aa2307c274b81",
+    "object_name": "Wooden Block",
+    "n_queries": 2,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/82/424814/00038/00038_nd."
+   },
+   {
+    "index": 41041,
+    "object_id": "9bd76b9ae2e5491caf7e98a09fe10597",
+    "object_name": "Drawer",
+    "n_queries": 3,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 41176,
+    "object_id": "2a39b038bb5b479ca2b38af44ac8e573",
+    "object_name": "Shelf",
+    "n_queries": 3,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 41256,
+    "object_id": "053a7f4ed5af4b47b6ea33517b111ce8",
+    "object_name": "Automatic Sliding Glass Door",
+    "n_queries": 5,
+    "reason": "unknown"
+   },
+   {
+    "index": 41276,
+    "object_id": "7c1068b83e79486ca1679a731ce15a8a",
+    "object_name": "Jar",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/79/407411/00005/00005_nd."
+   },
+   {
+    "index": 41538,
+    "object_id": "c9f36070dd93494dbca6e62d9d7476bb",
+    "object_name": "Bag",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/83/428915/00019/00019_nd."
+   },
+   {
+    "index": 41558,
+    "object_id": "b1886fdc827c4d44b66be40ca38ad3f3",
+    "object_name": "Coca-Cola Bottle",
+    "n_queries": 3,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 41581,
+    "object_id": "1197ed05ce854234810acc6a16707c6b",
+    "object_name": "Cone Lamp",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/88/450349/00013/00013_nd."
+   },
+   {
+    "index": 41704,
+    "object_id": "b82ab50266f14f21a5a869fa24cb71ff",
+    "object_name": "Miniature Keyboard",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 41828,
+    "object_id": "f72ae0533d964582aa63e504899e0f41",
+    "object_name": "Vase",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 42053,
+    "object_id": "0ba614d36a624901a7396ed0dbbbd518",
+    "object_name": "Pillow",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/120/610223/00030/00030_nd"
+   },
+   {
+    "index": 42072,
+    "object_id": "985cf571bad64aa5a86b0517fbf35deb",
+    "object_name": "Sofa",
+    "n_queries": 1,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 42086,
+    "object_id": "1cb2dfc2ab644ece865e811ba48511ed",
+    "object_name": "Ancient Greek Kylix",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/91/465507/00019/00019_nd."
+   },
+   {
+    "index": 42103,
+    "object_id": "823ce9635b2b4184a54d8a93c04933ab",
+    "object_name": "Pendant Light",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/123/627515/00000/00000_nd"
+   },
+   {
+    "index": 42552,
+    "object_id": "7ade84d635394cb9946e101d5859ad3e",
+    "object_name": "Chest",
+    "n_queries": 5,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 42591,
+    "object_id": "892a3d5abed346f88accd3fb34401aec",
+    "object_name": "Tire",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 42599,
+    "object_id": "e4385001e551473db043fe07b4f6521d",
+    "object_name": "Handgun",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 42861,
+    "object_id": "b3373981536640b98483a890d9a14060",
+    "object_name": "Adjustable Wrench",
+    "n_queries": 6,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 43503,
+    "object_id": "534ca221c6ea482d9f9bf13478022c32",
+    "object_name": "Bolt Cutters",
+    "n_queries": 0,
+    "reason": "zero stage1 queries"
+   },
+   {
+    "index": 43587,
+    "object_id": "ab4de12c94184bd0b28fe3b952caeeb9",
+    "object_name": "Teapot",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 43593,
+    "object_id": "42aeb51fab09478eaa26db90d81e6c87",
+    "object_name": "Refrigerator",
+    "n_queries": 7,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 43600,
+    "object_id": "81825cd46d4b415bbc29ae7d6ec31813",
+    "object_name": "Chair",
+    "n_queries": 2,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/129/657448/00015/00015_nd"
+   },
+   {
+    "index": 43625,
+    "object_id": "768963a38b2e4b1cb3c6e9eebb0b1012",
+    "object_name": "Pillow",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 43728,
+    "object_id": "730397cf546543d7aaa7f2df28a51b1e",
+    "object_name": "Shoe",
+    "n_queries": 7,
+    "reason": "SKIP: only 1 views"
+   },
+   {
+    "index": 43734,
+    "object_id": "ea44c4149cf54f46be0c514157d544b1",
+    "object_name": "Cabinet",
+    "n_queries": 7,
+    "reason": "SKIP: only 1 views"
+   },
+   {
+    "index": 44022,
+    "object_id": "595573d5538a4289b5fb38cb35dae029",
+    "object_name": "Skateboard",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/96/491742/00014/00014_nd."
+   },
+   {
+    "index": 44626,
+    "object_id": "9046c67502204a579a17f1619e90696e",
+    "object_name": "Barrel",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/139/707770/00007/00007_nd"
+   },
+   {
+    "index": 44638,
+    "object_id": "591ac582089148778213915bbb41ab8e",
+    "object_name": "Bench",
+    "n_queries": 0,
+    "reason": "zero stage1 queries"
+   },
+   {
+    "index": 45322,
+    "object_id": "e60729ea39e24f29a91eb5c41ac7c82b",
+    "object_name": "Tray",
+    "n_queries": 6,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 46473,
+    "object_id": "a0b5a145c42d4f30b896025710828559",
+    "object_name": "Floor Lamp",
+    "n_queries": 5,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 46601,
+    "object_id": "76f8482d0d584abea0897403179ca7ac",
+    "object_name": "Pillar",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 46973,
+    "object_id": "e76133d921f2468290fc8641ba99b463",
+    "object_name": "Circular Tray",
+    "n_queries": 2,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/61/319554/00037/00037_nd."
+   },
+   {
+    "index": 47049,
+    "object_id": "92cd3085608d48e88d7758c0432dd5dc",
+    "object_name": "Ice Tray",
+    "n_queries": 4,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 47095,
+    "object_id": "0564cfe62d5c465e9149864abf6e92de",
+    "object_name": "Storage Box",
+    "n_queries": 3,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 47267,
+    "object_id": "fcc3509365cf4729b19b9e68c97909d1",
+    "object_name": "Armchair",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/77/399942/00022/00022_nd."
+   },
+   {
+    "index": 47474,
+    "object_id": "6bdb83a6dbd941c3a5728272a1f11dfd",
+    "object_name": "Barrel",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 47477,
+    "object_id": "2069a0d4429447c6971b4ee0783e3d83",
+    "object_name": "Pastry",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/88/450623/00029/00029_nd."
+   },
+   {
+    "index": 48970,
+    "object_id": "b8792037ed0d4849b64476b666492260",
+    "object_name": "Bucket",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 49084,
+    "object_id": "b3af83630aa143478ed7694ae65a5ae7",
+    "object_name": "Onions",
+    "n_queries": 2,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 49523,
+    "object_id": "35c307db4f164e1eb7c21746b5afeea2",
+    "object_name": "Daybed",
+    "n_queries": 7,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 49652,
+    "object_id": "a2ef1e945e8a4d5b9b6425c96083a3b7",
+    "object_name": "Planter",
+    "n_queries": 4,
+    "reason": "SKIP: only 1 views"
+   },
+   {
+    "index": 49750,
+    "object_id": "ee82222af7644df5bff9002314ad4838",
+    "object_name": "Piano",
+    "n_queries": 5,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 49794,
+    "object_id": "89449a861507405eb07456056eaf582b",
+    "object_name": "Dress",
+    "n_queries": 6,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 49844,
+    "object_id": "48b03db174b94810a4ff036fffbb9d77",
+    "object_name": "Wooden Box/Container",
+    "n_queries": 6,
+    "reason": "SKIP: only 4 views"
+   },
+   {
+    "index": 49959,
+    "object_id": "30327c7a58544ff2806601c54be5f499",
+    "object_name": "Wooden Chest/Box",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/117/595954/00027/00027_nd"
+   },
+   {
+    "index": 50158,
+    "object_id": "2f9debb3e33c40a78c61d7e7ede39c85",
+    "object_name": "Blackboard",
+    "n_queries": 3,
+    "reason": "SKIP: only 1 views"
+   },
+   {
+    "index": 50318,
+    "object_id": "3976718aa72a47d08033d84c7a497845",
+    "object_name": "Jeans",
+    "n_queries": 7,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 50353,
+    "object_id": "31423c9a435c4dcab8ebb4f340ce2f1f",
+    "object_name": "Gift Box",
+    "n_queries": 6,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/28/150986/00007/00007_nd."
+   },
+   {
+    "index": 50615,
+    "object_id": "8009e70d9eac4361923bd968e0e62825",
+    "object_name": "Pot",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 50623,
+    "object_id": "c15e8651fd234ab0bca959ab93c6b14e",
+    "object_name": "Tablet",
+    "n_queries": 6,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 50674,
+    "object_id": "ae13108f454b40cb84a66cf07dc94294",
+    "object_name": "Coin Purse and Bottles",
+    "n_queries": 9,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/2/23345/00023/00023_nd.ex"
+   },
+   {
+    "index": 50866,
+    "object_id": "7574a9bd7a354fa99a4a98fd0fa4a99f",
+    "object_name": "Car Seat",
+    "n_queries": 4,
+    "reason": "SKIP: only 0 views"
+   },
+   {
+    "index": 51132,
+    "object_id": "8e096e7fb2f4467dad117c2aee8af42c",
+    "object_name": "Necklace Display Stand",
+    "n_queries": 5,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 52202,
+    "object_id": "f124ae9f3f2344afa017f05fd557ec9b",
+    "object_name": "Cycling Jersey",
+    "n_queries": 8,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 52946,
+    "object_id": "e58f0fa117d54223a9b8ba29bf222c6e",
+    "object_name": "Wooden Screen/Partition",
+    "n_queries": 6,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 53210,
+    "object_id": "87eeebb5431147c7a7b088254649d31a",
+    "object_name": "Pillow",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/113/577652/00018/00018_nd"
+   },
+   {
+    "index": 53849,
+    "object_id": "399bbe193dc34a718fbae5d83d715217",
+    "object_name": "Circular Pad",
+    "n_queries": 7,
+    "reason": "SKIP: only 1 views"
+   },
+   {
+    "index": 54166,
+    "object_id": "f500940881a243f88fe4850090787efb",
+    "object_name": "Hanging Lamp",
+    "n_queries": 2,
+    "reason": "FAILED: OSError: image file is truncated"
+   },
+   {
+    "index": 54527,
+    "object_id": "9ce77031ac2d4072bba9f0f984f841df",
+    "object_name": "Bowl",
+    "n_queries": 4,
+    "reason": "SKIP: only 2 views"
+   },
+   {
+    "index": 54611,
+    "object_id": "4e727adbcaea45b79bebc9d5764d1e0c",
+    "object_name": "Toilet Seat",
+    "n_queries": 3,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/8/51571/00026/00026_nd.ex"
+   },
+   {
+    "index": 55023,
+    "object_id": "0b1f35e7a069479dae60af033e2c507e",
+    "object_name": "Horn",
+    "n_queries": 6,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 56512,
+    "object_id": "cf59cc70307e4653afb48b6e9919ed54",
+    "object_name": "Fan",
+    "n_queries": 4,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/daily-used/131/669114/00018/00018_nd"
+   },
+   {
+    "index": 56765,
+    "object_id": "98955b5952774e3d8e3923725dcc92dd",
+    "object_name": "Incense Burner",
+    "n_queries": 0,
+    "reason": "zero stage1 queries"
+   },
+   {
+    "index": 57103,
+    "object_id": "595d39ac1347447eb19529ac3145fed7",
+    "object_name": "Chest",
+    "n_queries": 7,
+    "reason": "SKIP: only 3 views"
+   },
+   {
+    "index": 57299,
+    "object_id": "82f2709d4a5448c087b280a4f5d96f9f",
+    "object_name": "Shoe",
+    "n_queries": 7,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 57340,
+    "object_id": "3c97ce45ce594d3ba302ba6490d6e0d4",
+    "object_name": "Mug with a straw",
+    "n_queries": 7,
+    "reason": "SKIP: only 1 views"
+   }
+  ]
+ },
+ "electronics": {
+  "total": 5528,
+  "completed": 5524,
+  "missing": 4,
+  "objects": [
+   {
+    "index": 3934,
+    "object_id": "aaca7fd2323c4998b6043f3d8404a5e3",
+    "object_name": "Lamp",
+    "n_queries": 5,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 4101,
+    "object_id": "62d6c653b69d41b6b38e647840afe871",
+    "object_name": "Fan",
+    "n_queries": 5,
+    "reason": "FAILED: OSError: unreadable EXR depth: /nfs_drive/gobjaverse/electronics/127/646880/00028/00028_n"
+   },
+   {
+    "index": 4312,
+    "object_id": "f0db0244ca56439bb4573da3f15012b6",
+    "object_name": "Bathtub Faucet",
+    "n_queries": 4,
+    "reason": "FAILED: JSONDecodeError: Expecting value: line 1 column 1 (char 0"
+   },
+   {
+    "index": 5136,
+    "object_id": "8edded015ef044e1ae4411cdb40399bd",
+    "object_name": "Chandelier",
+    "n_queries": 4,
+    "reason": "SKIP: only 0 views"
+   }
+  ]
+ }
+}
