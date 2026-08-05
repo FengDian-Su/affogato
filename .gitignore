@@ -44,3 +44,12 @@ code/objaverse_to_affogato_v2.py
 .DS_Store
 .vscode/
 .claude/
+
+# data_verification: code and the small gold/label artifacts are tracked; bulk outputs are not
+data_verification/test_data/
+data_verification/outputs/
+data_verification/quality_evaluation/*/img/
+data_verification/quality_evaluation/pilot_render/
+data_verification/quality_evaluation/claude_pilot_1000/imgs
+data_verification/quality_evaluation/claude_pilot_1000/*.html
+data_verification/quality_evaluation/claude_pilot_1000/simple_verifier_1000/runs/

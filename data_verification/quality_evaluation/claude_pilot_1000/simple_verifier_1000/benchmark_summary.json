@@ -1,0 +1,42 @@
+{
+ "schema_version": "benchmark-split-v3",
+ "seed": 20260805,
+ "gold": "metadata_labels.gold.jsonl + heatmap_labels.gold.jsonl (re-labelled 2026-08-05)",
+ "dev": 700,
+ "test": 300,
+ "object_overlap": 0,
+ "dev_objects": 697,
+ "test_objects": 300,
+ "dev_metadata_dist": {
+  "0": 33,
+  "1": 152,
+  "2": 515
+ },
+ "test_metadata_dist": {
+  "0": 14,
+  "1": 65,
+  "2": 221
+ },
+ "dev_heatmap_dist": {
+  "0": 54,
+  "1": 145,
+  "2": 501
+ },
+ "test_heatmap_dist": {
+  "0": 22,
+  "1": 63,
+  "2": 215
+ },
+ "dev_strata": {
+  "m0_h0": 3,
+  "m0_h1": 8,
+  "m0_h2": 22,
+  "m1_h0": 15,
+  "m1_h1": 37,
+  "m1_h2": 100,
+  "m2_h0": 36,
+  "m2_h1": 100,
+  "m2_h2": 379
+ },
+ "split_sha256": "dc762854f5c62c195e9499577902caa13dc690f2b0597211010fe79cdc9962db"
+}

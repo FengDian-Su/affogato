@@ -1,0 +1,39 @@
+{
+ "schema_version": "claude-gold-v1.0",
+ "n": 1000,
+ "dataset": "daily_used",
+ "labelled": "2026-08-05",
+ "annotator": "claude-gold-v1",
+ "is_human_gold": false,
+ "rubric_metadata": "bimanual-necessity-corrected: redundancy is not a defect, obstruction is",
+ "rubric_heatmap": "extent judged against the description, not against area",
+ "render_protocol": "render_eval-8view-tau0.15 (spec L4)",
+ "score_distribution": {
+  "metadata": {
+   "0": 47,
+   "1": 217,
+   "2": 736
+  },
+  "heatmap": {
+   "0": 76,
+   "1": 208,
+   "2": 716
+  }
+ },
+ "metadata_fault_counts_on_0": {
+  "forces_cancel": 14,
+  "action_cannot_produce_effect": 9,
+  "part_absent": 14,
+  "hand_obstructs": 1,
+  "task_not_possible": 9
+ },
+ "heatmap_fault_counts": {
+  "faint_or_drifting": 114,
+  "covers_unmentioned_surfaces": 92,
+  "wrong_part": 25,
+  "essentially_absent": 48,
+  "ab_collapsed": 5
+ },
+ "metadata_sha256": "c9c5305de83ddc72b34c7e778531be3da77cba454b45c6a3aa341012f7864edf",
+ "heatmap_sha256": "c296368c229362b243c7c05397f8877a9674abc908c10c9b471030027f5fbad0"
+}
