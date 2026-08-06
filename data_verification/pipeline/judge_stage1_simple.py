@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
-"""Minimal RGB-conditioned task/role verifier for the Claude pilot benchmark."""
+"""Minimal RGB-conditioned task/role verifier for the Claude pilot benchmark.
+
+The adopted variant is `multi` (one call, four sub-scores, overall = min). Its prompt was selected
+2026-08-06 after 29 measured dev-700 iterations. Profile against the re-labelled Claude gold
+(dev 700, run-to-run 99.9% reproducible): gold-bad auto-accepted 2/20, accept contamination 0.4%,
+lid/cap-family accepted 47/55, wrongly-rejected good 21, class means 0.85/1.46/1.76.
+
+Prompt lessons that are load-bearing (measured, easy to undo by accident):
+- ordering inside a question is decisive: "Is the task a sensible thing to do with this object,
+  and does it act on something this object has?" catches infeasible tasks; the same clauses in the
+  reverse order are a measured no-op.
+- naming a failure concept amplifies it (writing "not rigid merely because..." tripled
+  rigidity-based rejections); the prompt deliberately never contains "rigid" or "cancel".
+- 0 is reachable only through affirmative visual contradiction; capability phrasing ("can this
+  object actually perform it") re-opens mechanism-hunting and kills the lid/cap family.
+"""
 
 import json
 
@@ -7,7 +22,7 @@ from simple_verifier_common import WorkItem, verifier_main
 
 
 AXIS = "stage1"
-VERSION = "qwen3vl-stage1-simple-v12.0"
+VERSION = "qwen3vl-stage1-multi-v1.0"
 
 # The breakage half of the `mcq` answer space (the other two answers, acceptable_imprecise and
 # fully_sound, are added by mcq_answers()). Ids match the gold `fault` vocabulary so tag agreement is
@@ -147,10 +162,6 @@ everything it says is borne out, nothing is left loose. 0 is for one that is vis
 whole middle - it holds together, but something about it is loose, and it is where anything you
 cannot settle belongs.
 
-2 is earned, not assumed. Give it when you have checked each thing the description claims and found
-each one to hold - not when nothing happened to catch your eye. If you would have to say "probably"
-about any part of it, that part is loose, and the answer is 1.
-
 Each hand action is the nearest primitive from this fixed vocabulary: hold, lift, push, pull, press, slide, rotate, squeeze. It need only contribute to the task, not describe the complete task motion. The stated function must nevertheless be a plausible consequence of that action at that target and contact; merely repeating the task is not a function.
 
 Judge whether both hands can act simultaneously at reachable, distinct contact regions. Matching actions are valid, and holding, supporting or steadying is a real contribution. Touching the same object is not a conflict. A role conflict exists only when the descriptions require one hand to prevent the exact motion the other must produce; do not infer one from presumed attachment or construction.
@@ -163,7 +174,7 @@ Use this scale:
 0 = the views affirmatively contradict the description, or the stated roles are mutually impossible.
 
 Apply it separately:
-task: Does the task act on something this object has? A different object or a feature clearly shown absent is contradictory.
+task: Is the task a sensible thing to do with this object, and does it act on something this object has? A different object or a feature clearly shown absent is contradictory.
 bimanual: Do the two hand contributions combine into one coherent operation?
 hand_A / hand_B: Does that hand's action, target, contact and function form one coherent contribution?""",
 

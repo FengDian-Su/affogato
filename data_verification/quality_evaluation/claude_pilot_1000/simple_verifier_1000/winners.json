@@ -1,0 +1,14 @@
+{
+ "stage1": {
+  "variant": "multi",
+  "prompt_version": "qwen3vl-stage1-multi-v1.0",
+  "selected_on": "dev",
+  "date": "2026-08-06",
+  "dev_profile": {
+   "gold_bad_auto_accepted": "2/20",
+   "accept_contamination": 0.004,
+   "lid_family_accepted": "47/55",
+   "good_wrongly_rejected": 21
+  }
+ }
+}

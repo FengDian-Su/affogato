@@ -10,8 +10,8 @@
  "render_protocol": "render_eval-8view-tau0.15 (spec L4)",
  "score_distribution": {
   "metadata": {
-   "0": 47,
-   "1": 217,
+   "0": 33,
+   "1": 231,
    "2": 736
   },
   "heatmap": {
@@ -21,7 +21,6 @@
   }
  },
  "metadata_fault_counts_on_0": {
-  "forces_cancel": 14,
   "action_cannot_produce_effect": 9,
   "part_absent": 14,
   "hand_obstructs": 1,
@@ -34,6 +33,14 @@
   "essentially_absent": 48,
   "ab_collapsed": 5
  },
- "metadata_sha256": "c9c5305de83ddc72b34c7e778531be3da77cba454b45c6a3aa341012f7864edf",
- "heatmap_sha256": "c296368c229362b243c7c05397f8877a9674abc908c10c9b471030027f5fbad0"
+ "metadata_sha256": "1eabed9d38cdce6e8d580a0019bbe1f1632694d6c724865ad6ebe25f76fd37c7",
+ "heatmap_sha256": "c296368c229362b243c7c05397f8877a9674abc908c10c9b471030027f5fbad0",
+ "revisions": [
+  {
+   "on": "2026-08-06",
+   "n": 14,
+   "change": "same-body stabilize/anchor family 0 -> 1 (imprecise wording, not obstruction)",
+   "record": "reclassification_same_body_2026-08-06.jsonl"
+  }
+ ]
 }
