@@ -390,6 +390,10 @@ SUPPORT_THR = 0.15                 # "this point belongs to the region" cutoff, 
 HI_RE = re.compile(r"\b(upper|top|uppermost)\b", re.I)
 LO_RE = re.compile(r"\b(lower|bottom|base|beneath|under|below)\b", re.I)
 OPP_RE = re.compile(r"\b(opposite|other side|each side|both sides|two sides|either side)\b", re.I)
+# relative-offset prepositions: everything after one describes a LANDMARK, not
+# the role's own level ("the upper wall just below the lid" is high up).
+REL_PREP_RE = re.compile(r"\b(just |directly |immediately |slightly )?"
+                         r"(below|under|underneath|beneath|above|over)\s+the\b", re.I)
 # partition gate for "body-level" targets; DELIBERATELY wider than the SAM
 # mask-selection rule (stage2_v2.is_body_target, an EXACT "body" match since
 # 2db61cb) — the two were calibrated separately, do not unify.
@@ -397,8 +401,20 @@ BODY_TARGET_RE = re.compile(r"\b(body|wall|surface|face|corner|side|bag)\b", re.
 
 
 def _vert_term(role):
-    """+1 / -1 / 0: vertical level a role's contact_region declares."""
+    """+1 / -1 / 0: vertical level a role's contact_region declares.
+
+    A region's OWN level word wins over a landmark relation: "the upper wall
+    just below the lid" is high up, but a flat keyword scan sees both `upper`
+    and `below` and reports "no signal", so the pair loses its gravity cut
+    (measured: 36 same-target queries, all tilt/pour containers). Read the
+    head — the text before the first relative-offset preposition — and fall
+    back to the whole string only when the head declares no level at all
+    ("the side wall below the lid" really is the lower one).
+    """
     cr = str(role.get("contact_region", ""))
+    head = REL_PREP_RE.split(cr)[0]
+    if HI_RE.search(head) or LO_RE.search(head):
+        cr = head
     hi, lo = bool(HI_RE.search(cr)), bool(LO_RE.search(cr))
     return 1 if hi and not lo else (-1 if lo and not hi else 0)
 
