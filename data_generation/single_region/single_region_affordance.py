@@ -471,24 +471,31 @@ def _score_anchor(s, xyz):
 
 
 def _standing_cut(scoreA, scoreB, xyz, thr):
-    """Standing (vertical-plane) end-cut of the union region: cut normal = the
-    region's LONGEST horizontal canvas axis, plane through the region's
-    weighted centroid — hands grab the two far ends of the long axis, like
-    humans do. Percentile span so a stray point cannot flip the axis choice
-    (min-material-crossing picked the short axis in 27% of measured co-lift
-    cases); region span, not object bbox, so a sub-part region (both hands on
-    one face) still splits along ITS wide axis instead of a degenerate one.
-    Sides assigned by each role's own mass. None when the support is tiny."""
+    """Standing (vertical-plane) end-cut of the union region, in the OBJECT's
+    own yaw frame: derotate the horizontal coords by the footprint's
+    minimum-area-rectangle angle (one estimate per object; 28% of canvases sit
+    >15 deg off-axis and an axis-aligned plane slices them diagonally), then
+    cut normal = the region's LONGEST horizontal axis through its weighted
+    centroid — hands grab the two far ends, like humans do. min-area rect,
+    not PCA: a square footprint's rect is still wall-aligned, so the
+    degenerate case stays wall-parallel instead of a random 45 deg slice.
+    Percentile span so a stray point cannot flip the axis choice; region
+    span, not object bbox, so a sub-part region (both hands on one face)
+    splits along ITS wide axis. Sides assigned by each role's own mass.
+    None when the support is tiny."""
     region = np.maximum(scoreA, scoreB)
     m = region > thr
     if m.sum() < 10:
         return None
-    Xh = xyz[m][:, HOR_AXES]
+    th = np.radians(cv2.minAreaRect(xyz[:, HOR_AXES].astype(np.float32))[2])
+    R = np.array([[np.cos(th), np.sin(th)], [-np.sin(th), np.cos(th)]])
+    Xr = xyz[:, HOR_AXES] @ R.T
+    Xh = Xr[m]
     w = region[m]
     mu = (Xh * w[:, None]).sum(0) / w.sum()
     span = np.percentile(Xh, 98, axis=0) - np.percentile(Xh, 2, axis=0)
     d = np.eye(2)[int(span.argmax())]
-    side = (xyz[:, HOR_AXES] - mu) @ d >= 0
+    side = (Xr - mu) @ d >= 0
     a_side = scoreA[side].sum() >= scoreA[~side].sum()
     return (np.where(side == a_side, region, 0.0),
             np.where(side == a_side, 0.0, region))
