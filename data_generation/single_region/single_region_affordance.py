@@ -470,34 +470,53 @@ def _score_anchor(s, xyz):
     return (xyz[m] * s[m, None]).sum(0) / s[m].sum()
 
 
+def _standing_cut(scoreA, scoreB, xyz, thr):
+    """Standing (vertical-plane) end-cut of the union region: cut normal = the
+    region's LONGEST horizontal canvas axis, plane through the region's
+    weighted centroid — hands grab the two far ends of the long axis, like
+    humans do. Percentile span so a stray point cannot flip the axis choice
+    (min-material-crossing picked the short axis in 27% of measured co-lift
+    cases); region span, not object bbox, so a sub-part region (both hands on
+    one face) still splits along ITS wide axis instead of a degenerate one.
+    Sides assigned by each role's own mass. None when the support is tiny."""
+    region = np.maximum(scoreA, scoreB)
+    m = region > thr
+    if m.sum() < 10:
+        return None
+    Xh = xyz[m][:, HOR_AXES]
+    w = region[m]
+    mu = (Xh * w[:, None]).sum(0) / w.sum()
+    span = np.percentile(Xh, 98, axis=0) - np.percentile(Xh, 2, axis=0)
+    d = np.eye(2)[int(span.argmax())]
+    side = (xyz[:, HOR_AXES] - mu) @ d >= 0
+    a_side = scoreA[side].sum() >= scoreA[~side].sum()
+    return (np.where(side == a_side, region, 0.0),
+            np.where(side == a_side, 0.0, region))
+
+
 def partition_two_roles(scoreA, scoreB, roleA, roleB, xyz, thr=SUPPORT_THR):
     """Resolve the two grounded role heatmaps into two DISJOINT regions.
 
     Molmo grounds each role independently, so symmetric co-lifts collapse onto
-    one region and asymmetric grasps overlap at part boundaries. Three layers,
-    all object-agnostic (query text + score geometry only):
+    one region and asymmetric grasps overlap at part boundaries. The cut plane
+    only ever has TWO poses (08-04, replacing the anchor-direction oblique
+    cuts, whose direction was pure noise whenever Molmo pointed both roles at
+    the same spot — exactly the symmetric case):
 
-    1) text-declared SYMMETRY -- same target, contact_regions carry
-       opposite/other-side wording, no one-sided vertical relation:
-       straight vertical cut through the region center, normal to its LONGEST
-       horizontal canvas axis — hands grab the two far ends of the long axis
-       (canvas frames are canonical, so box walls align with axes; angle scans
-       tilt on count noise). Sides assigned by each role's own mass. The
-       earlier least-material-crossing rule picked the SHORT axis in 27% of
-       measured co-lift cases and was replaced 07-17.
-    2) text-declared VERTICAL relation -- horizontal (gravity) cut at the two
-       roles' anchor-height midpoint, the declared-upper role above. Triggers
-       on same-target pairs with a vertical relation, or on any pair where BOTH
-       sides declare opposing terms AND both targets are body-level (votes on
-       body-level targets are saturated and carry no part signal; named parts
-       stay evidence-driven -- hard text planes chop them: measured 0.735 vs
-       0.768 FINAL-AUC when ungated).
-    3) EVIDENCE split -- same-target: vertical plane at the two score anchors'
-       midpoint, each half to the role whose anchor sits on it; diff-target:
-       per-point winner-take-all on the >thr overlap with per-role p99
+    STANDING (default) -- same-target pairs, whether the text declares
+       symmetry (opposite/both-sides wording) or carries no direction at all:
+       _standing_cut, the two ends of the region's longest horizontal axis.
+    FLAT (gravity cut) -- ONLY when the two contact_regions declare OPPOSING
+       vertical terms (one top-ish, one bottom-ish; single-sided wording is no
+       signal): horizontal cut at the roles' anchor-height midpoint, the
+       declared-upper role above. Gated to same-target or body-level pairs
+       (votes on body-level targets are saturated and carry no part signal;
+       named parts stay evidence-driven -- hard text planes chop them:
+       measured 0.735 vs 0.768 FINAL-AUC when ungated).
+    diff-target overlaps stay per-point winner-take-all with per-role p99
        normalization (a small part's peak beats a dominant role's diffuse
-       score, so it keeps its patch). Sub-threshold scores are left in place:
-       exclusivity is required on the support, ranking information survives.
+       score). Sub-threshold scores are left in place: exclusivity is required
+       on the support, ranking information survives.
 
     Returns (scoreA', scoreB').
     """
@@ -506,29 +525,16 @@ def partition_two_roles(scoreA, scoreB, roleA, roleB, xyz, thr=SUPPORT_THR):
     crs = str(roleA.get("contact_region", "")) + " | " + str(roleB.get("contact_region", ""))
     diag = float(np.linalg.norm(xyz.max(0) - xyz.min(0)))
 
-    # ---- 1) symmetric text: canvas-axis center cut --------------------------
+    # ---- 1) symmetric text: standing end-cut --------------------------------
     if same and OPP_RE.search(crs) and vA == vB:
-        region = np.maximum(scoreA, scoreB)
-        m = region > thr
-        if m.sum() >= 10:
-            Xh = xyz[m][:, HOR_AXES]
-            w = region[m]
-            mu = (Xh * w[:, None]).sum(0) / w.sum()
-            # cut normal = the region's LONGEST horizontal axis: hands grab the
-            # two far ends of the long axis, like humans do (percentile span
-            # so a stray point cannot flip the choice; min-material-crossing
-            # picked the short axis in 27% of measured co-lift cases)
-            span = np.percentile(Xh, 98, axis=0) - np.percentile(Xh, 2, axis=0)
-            d = np.eye(2)[int(span.argmax())]
-            side = (xyz[:, HOR_AXES] - mu) @ d >= 0
-            a_side = scoreA[side].sum() >= scoreA[~side].sum()
-            return (np.where(side == a_side, region, 0.0),
-                    np.where(side == a_side, 0.0, region))
+        cut = _standing_cut(scoreA, scoreB, xyz, thr)
+        if cut is not None:
+            return cut
 
-    # ---- 2) vertical text: horizontal gravity cut ---------------------------
+    # ---- 2) OPPOSING vertical text: flat gravity cut ------------------------
     bodyish = bool(BODY_TARGET_RE.search(str(roleA.get("target", "")))
                    and BODY_TARGET_RE.search(str(roleB.get("target", ""))))
-    if (vA * vB == -1 and bodyish) or (same and vA != vB):
+    if vA * vB == -1 and (bodyish or same):
         hiA = vA > vB
         aA, aB = _score_anchor(scoreA, xyz), _score_anchor(scoreB, xyz)
         if aA is not None and aB is not None and abs(aA[UP_AXIS] - aB[UP_AXIS]) > 0.02 * diag:
@@ -558,33 +564,14 @@ def partition_two_roles(scoreA, scoreB, roleA, roleB, xyz, thr=SUPPORT_THR):
 
 
 def _partition_evidence(scoreA, scoreB, xyz, thr, same, diag):
-    if same:                     # anchor-directed vertical cut of the union
-        region = np.maximum(scoreA, scoreB)
-        m = region > thr
-        if m.sum() < 10:
-            return scoreA, scoreB
-        aA, aB = _score_anchor(scoreA, xyz), _score_anchor(scoreB, xyz)
-        d = None
-        if aA is not None and aB is not None:
-            d = aB - aA
-            d[UP_AXIS] = 0.0
-            if np.linalg.norm(d) < 0.05 * diag:
-                d = None
-        # NB: a role with zero votes anchors to None and lands here -> the
-        # union is still split half/half (same-target roles are interchangeable,
-        # so the halves stay usable; the pre-port code NaN'd on this input).
-        if d is None:            # anchors collapsed -> widest horizontal axis
-            pts = xyz[m][:, HOR_AXES] - xyz[m][:, HOR_AXES].mean(0)
-            ax2 = np.linalg.svd(pts, full_matrices=False)[2][0]
-            d = np.zeros(3)
-            d[HOR_AXES[0]], d[HOR_AXES[1]] = ax2[0], ax2[1]
-            aA = aB = xyz[m].mean(0)
-        d = d / np.linalg.norm(d)
-        mid = (aA + aB) / 2.0
-        # A gets its anchor's side: aA projects <= 0 along d = aB - aA (and the
-        # SVD fallback has aA == mid), so the non-positive half is A's.
-        on_a = (xyz - mid) @ d <= 0
-        return np.where(on_a, region, 0.0), np.where(~on_a, region, 0.0)
+    if same:                     # symmetric / no-signal roles: standing end-cut
+        # (was: cut normal = the two anchors' difference vector — pure noise
+        # whenever Molmo collapsed both roles onto one spot, i.e. exactly the
+        # symmetric case -> oblique cuts. Same-target roles are interchangeable,
+        # so the geometric end-cut is always usable; each role still gets the
+        # half where its own mass sits.)
+        cut = _standing_cut(scoreA, scoreB, xyz, thr)
+        return cut if cut is not None else (scoreA, scoreB)
 
     mA, mB = scoreA > thr, scoreB > thr              # diff-target: p99-normalized WTA
     if not (mA & mB).any():
