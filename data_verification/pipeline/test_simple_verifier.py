@@ -154,6 +154,21 @@ class SimpleVerifierTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             codex_s2.validate_results({"results": [wrong]}, [sid])
 
+    def test_stage2_location_hints_are_low_authority_and_cache_separated(self):
+        row = read_jsonl(ROOT / "manifest.jsonl")[0]
+        item = codex_s2.add_location_hints(s2.build_item(row), row)
+        self.assertIn("Optional intermediate location proposals:", item.user_text)
+        self.assertIn("fallible proposals identify parts", item.user_text)
+        self.assertIn("Agreement cannot rescue poor formation", item.user_text)
+        self.assertIn("another clearly plausible two-hand execution", item.user_text)
+        self.assertIn("identify its concrete physical role", item.user_text)
+        self.assertIn("Difference in location, breadth, or size alone", item.user_text)
+        plain = codex_s2.batch_key([item.sample_id], "rgb-aligned-composite")
+        hinted = codex_s2.batch_key([item.sample_id], "rgb-aligned-composite",
+                                    location_hints=True)
+        self.assertNotEqual(plain, hinted)
+        self.assertIn(codex_s2.LOCATION_HINT_CALIBRATION, hinted)
+
 
 if __name__ == "__main__":
     unittest.main()

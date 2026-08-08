@@ -28,6 +28,7 @@ from simple_verifier_common import read_jsonl
 
 DEFAULT_MODEL = "gpt-5.6-sol"
 ANCHOR_CALIBRATION = "visual-anchors-v15-formation-first"
+LOCATION_HINT_CALIBRATION = "location-hints-v2-semantic-reference"
 
 
 def image_paths(item: Any) -> tuple[str, ...]:
@@ -72,7 +73,8 @@ def result_schema(sample_ids: list[str]) -> dict[str, Any]:
     }
 
 
-def batch_key(sample_ids: list[str], input_format: str, anchored: bool = False) -> str:
+def batch_key(sample_ids: list[str], input_format: str, anchored: bool = False,
+              location_hints: bool = False) -> str:
     digest = hashlib.sha256("\n".join(sample_ids).encode()).hexdigest()[:12]
     stem = f"{sample_ids[0].split('/')[0]}__n{len(sample_ids)}__{digest}"
     # Preserve the original split-run key so the completed two-image calls remain resumable.  The
@@ -80,7 +82,44 @@ def batch_key(sample_ids: list[str], input_format: str, anchored: bool = False) 
     if input_format != "split":
         stem = f"{input_format.replace('-', '_')}__{stem}"
     prompt_key = hashlib.sha256(f"{VERSION}\n{ANCHOR_CALIBRATION}".encode()).hexdigest()[:8]
-    return f"{ANCHOR_CALIBRATION}__p{prompt_key}__{stem}" if anchored else f"p{prompt_key}__{stem}"
+    calibration = []
+    if anchored:
+        calibration.append(ANCHOR_CALIBRATION)
+    if location_hints:
+        calibration.append(LOCATION_HINT_CALIBRATION)
+    prefix = "__".join(calibration)
+    return f"{prefix}__p{prompt_key}__{stem}" if prefix else f"p{prompt_key}__{stem}"
+
+
+def add_location_hints(item: Any, row: dict[str, Any]) -> Any:
+    """Attach fallible intermediate locations without changing the task-only scoring target."""
+    with open(row["meta_path"], encoding="utf-8") as stream:
+        meta = json.load(stream)
+    roles = meta.get("roles")
+    if not isinstance(roles, list) or len(roles) != 2:
+        raise ValueError(f"{row['sample_id']}: meta.roles must contain exactly two hands")
+
+    def proposal(label: str, colour: str, role: dict[str, Any]) -> str:
+        action = str(role.get("role") or "contact").strip()
+        location = str(role.get("contact_region") or "unspecified region").strip()
+        return f"- {colour.title()} / Hand {label}: {action} @ {location}"
+
+    hint_text = "\n".join([
+        "Optional intermediate location proposals:",
+        proposal("A", "orange", roles[0]),
+        proposal("B", "teal", roles[1]),
+        "These fallible proposals identify parts and clarify the intended manipulation; they are not "
+        "ground truth, exact masks, or the only valid contacts. Fix both formation grades from the "
+        "heatmaps before reading them. Agreement cannot rescue poor formation. For task fit, accept a "
+        "formed candidate if it reasonably matches its proposal OR supports another clearly plausible "
+        "two-hand execution of the task. When accepting a different location, identify its concrete "
+        "physical role in that execution. Mark it inconsistent only if it can neither match the "
+        "proposal nor contribute to a concrete alternative execution. Difference in location, breadth, "
+        "or size alone is not inconsistency.",
+    ])
+    lines = item.user_text.splitlines()
+    lines.insert(-1, hint_text)
+    return replace(item, user_text="\n".join(lines))
 
 
 def validate_results(value: Any, sample_ids: list[str]) -> list[dict[str, Any]]:
@@ -261,11 +300,12 @@ def run_batch(
     items: list[Any],
     input_format: str,
     anchors: list[tuple[Any, dict[str, Any]]],
+    location_hints: bool,
     retries: int,
     timeout: int,
 ) -> tuple[str, list[dict[str, Any]], bool]:
     sample_ids = [item.sample_id for item in items]
-    key = batch_key(sample_ids, input_format, bool(anchors))
+    key = batch_key(sample_ids, input_format, bool(anchors), location_hints)
     response_path = batch_dir / f"{key}.json"
     cached = load_cached(response_path, items)
     if cached is not None:
@@ -318,7 +358,8 @@ def run_batch(
 
 
 def write_labels(path: Path, manifest_rows: list[dict[str, Any]], results: dict[str, dict[str, Any]],
-                 model: str, input_format: str, anchored: bool = False) -> None:
+                 model: str, input_format: str, anchored: bool = False,
+                 location_hints: bool = False) -> None:
     lines = []
     for manifest in manifest_rows:
         sid = manifest["sample_id"]
@@ -341,7 +382,12 @@ def write_labels(path: Path, manifest_rows: list[dict[str, Any]], results: dict[
             "teal_task_fit": row["teal_task_fit"],
             "model": model,
             "prompt_version": VERSION,
-            "prompt_calibration": ANCHOR_CALIBRATION if anchored else "none",
+            "prompt_calibration": (
+                "+".join(name for enabled, name in (
+                    (anchored, ANCHOR_CALIBRATION),
+                    (location_hints, LOCATION_HINT_CALIBRATION),
+                ) if enabled) or "none"
+            ),
             "render_scheme": ({
                 "composite": "split-composite-bright-color-tau0.15",
                 "rgb-composite": "rgb-reference-plus-split-composite-bright-color-tau0.15",
@@ -373,6 +419,8 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--visual-anchors", action="store_true",
                         help="attach the human-labeled visual anchors declared by the judge prompt")
+    parser.add_argument("--location-hints", action="store_true",
+                        help="supply fallible per-hand role/contact proposals only as task-fit hints")
     parser.add_argument("--exclude-visual-anchor-candidates", action="store_true",
                         help="exclude anchor IDs from candidate rows after offset, before limit")
     parser.add_argument("--sample-id", action="append", default=[],
@@ -422,6 +470,8 @@ def main() -> None:
             anchor = replace(build_item(row), image_path=paths)
             anchors.append((anchor, spec))
     items = [build_item(row) for row in manifests]
+    if args.location_hints:
+        items = [add_location_hints(item, row) for item, row in zip(items, manifests)]
     if args.input_format == "composite":
         # WorkItem is frozen; keep the exact claims from build_item and replace only its image input.
         items = [replace(item, image_path=row["heat_png"]) for item, row in zip(items, manifests)]
@@ -445,7 +495,7 @@ def main() -> None:
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as pool:
         futures = {
             pool.submit(run_batch, codex, repo, args.model, batch_dir, batch, args.input_format,
-                        anchors, args.retries, args.timeout): batch
+                        anchors, args.location_hints, args.retries, args.timeout): batch
             for batch in batches
         }
         for future in concurrent.futures.as_completed(futures):
@@ -470,12 +520,18 @@ def main() -> None:
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    write_labels(out, manifests, all_results, args.model, args.input_format, bool(anchors))
+    write_labels(out, manifests, all_results, args.model, args.input_format, bool(anchors),
+                 args.location_hints)
     summary = {
         "model": args.model,
         "prompt_version": VERSION,
         "input_format": args.input_format,
-        "prompt_calibration": ANCHOR_CALIBRATION if anchors else "none",
+        "prompt_calibration": (
+            "+".join(name for enabled, name in (
+                (bool(anchors), ANCHOR_CALIBRATION),
+                (args.location_hints, LOCATION_HINT_CALIBRATION),
+            ) if enabled) or "none"
+        ),
         "samples": len(items),
         "batch_size": args.batch_size,
         "score_distribution": {
