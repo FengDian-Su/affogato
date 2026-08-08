@@ -4,10 +4,12 @@
 import json
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 import judge_stage1_simple as s1
 import judge_stage2_simple as s2
+import run_codex_stage2 as codex_s2
 from evaluate_simple_verifier import evaluate
 from simple_verifier_common import (MCQ_GOOD, MCQ_OK, VARIANT_KEYS, _parse, cascade_score, common_parser,
                                     mcq_schema, mcq_score, read_jsonl, validate_locked_test)
@@ -121,7 +123,18 @@ class SimpleVerifierTests(unittest.TestCase):
         self.assertEqual(metrics["prediction_distribution"], {0: 1, 1: 1, 2: 1})
         self.assertEqual(len(failures), 1)
 
+    def test_rgb_reference_prompt_keeps_image_pairs_aligned(self):
+        row = read_jsonl(ROOT / "manifest.jsonl")[0]
+        item = replace(s2.build_item(row), image_path=(row["rgb_png"], row["heat_png"]))
+        prompt = codex_s2.make_prompt(
+            [item], "rgb-aligned-composite", [(item, {"score": 2, "note": "formed contact"})]
+        )
+        self.assertIn("images 1 and 2 (RGB, then heatmap)", prompt)
+        self.assertIn("attached images 3 and 4 (RGB, then A/B heatmap)", prompt)
+        self.assertIn("same selected\nviews in the same positions", prompt)
+        self.assertIn("rgb_aligned_composite__",
+                      codex_s2.batch_key([item.sample_id], "rgb-aligned-composite", True))
+
 
 if __name__ == "__main__":
     unittest.main()
-

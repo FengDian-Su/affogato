@@ -63,15 +63,22 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dir", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--manifest", default=None,
+                    help="manifest JSONL to use (default: DIR/manifest.jsonl)")
     ap.add_argument("--labels", default=None,
                     help="JSONL verdicts to display (default: DIR/heatmap_labels.gold.jsonl)")
     ap.add_argument("--allow-subset", action="store_true",
                     help="allow labels to contain a reviewed subset of the manifest (preview only)")
+    ap.add_argument("--show-rgb", action="store_true",
+                    help="show the aligned multi-view RGB geometry reference above each heatmap pair")
+    ap.add_argument("--aligned", action="store_true",
+                    help="use rgb_png_aligned and heat_png_{A,B}_aligned from the manifest")
     ap.add_argument("--per-page", type=int, default=100)
     a = ap.parse_args()
     D, base = a.dir, os.path.dirname(os.path.abspath(a.out))
 
-    man = {json.loads(l)["sample_id"]: json.loads(l) for l in open(f"{D}/manifest.jsonl")}
+    manifest_path = a.manifest or f"{D}/manifest.jsonl"
+    man = {json.loads(l)["sample_id"]: json.loads(l) for l in open(manifest_path)}
     labels_path = a.labels or f"{D}/heatmap_labels.gold.jsonl"
     gold = {json.loads(l)["sample_id"]: json.loads(l) for l in open(labels_path)}
     if set(gold) != set(man) and not (a.allow_subset and set(gold) < set(man)):
@@ -88,6 +95,9 @@ def main():
         meta = json.load(open(m["meta_path"]))
         ra, rb = meta["roles"][0], meta["roles"][1]
         n, na, nb = active_counts(m["scores_path"])
+        rgb_key = "rgb_png_aligned" if a.aligned else "rgb_png"
+        heat_a_key = "heat_png_A_aligned" if a.aligned else "heat_png_A"
+        heat_b_key = "heat_png_B_aligned" if a.aligned else "heat_png_B"
         rows.append({
             "sid": sid, "obj": meta["object_name"], "task": meta["task"],
             "A": g.get("score_A"), "B": g.get("score_B"), "o": g["overall_score"],
@@ -97,7 +107,8 @@ def main():
             "aa": g.get("orange_alignment", ""), "ba": g.get("teal_alignment", ""),
             "ash": g.get("orange_shape", ""), "bsh": g.get("teal_shape", ""),
             "na": na, "nb": nb, "pa": 100 * na / n, "pb": 100 * nb / n,
-            "ia": rel(m["heat_png_A"], base), "ib": rel(m["heat_png_B"], base),
+            "ir": rel(m[rgb_key], base),
+            "ia": rel(m[heat_a_key], base), "ib": rel(m[heat_b_key], base),
         })
     rows.sort(key=lambda r: (r["o"], min(r["A"], r["B"]), r["sid"]))
 
@@ -112,12 +123,15 @@ def main():
     <span class="pts">{npts} pts &middot; {pct:.2f}%</span></div>
   <div class="ct">{html.escape(contact)}</div>
   {quality}<img loading="lazy" src="{img}"></div>"""
+        rgb = (f'<div class="rgb"><div class="quality">RGB geometry reference · matched views</div>'
+               f'<img loading="lazy" src="{r["ir"]}"></div>' if a.show_rgb else "")
         return f"""<div class="card" data-o="{r['o']}" data-f="{r['f']}">
   <div class="hd"><b>{html.escape(r['obj'])}</b> &mdash; {html.escape(r['task'])}
     <span class="pill s{r['o']}">overall {r['o']}</span>
     <span class="pill tag">{html.escape(r['f'])}</span>
     <span class="sid">{html.escape(r['sid'])}</span></div>
   <div class="rs">{html.escape(r['r'])}</div>
+  {rgb}
   <div class="two">{half('HAND A', 'oa', r['A'], r['ca'], r['ia'], r['na'], r['pa'], r['aa'], r['ash'])}
 {half('HAND B', 'ob', r['B'], r['cb'], r['ib'], r['nb'], r['pb'], r['ba'], r['bsh'])}</div>
 </div>"""
@@ -136,6 +150,7 @@ h1{font-size:19px;margin:0 0 6px} .dim{color:#777;font-weight:400;font-size:13px
 .hd{font-size:15px;margin-bottom:4px}
 .sid{color:#999;font-size:11.5px;margin-left:8px;font-family:ui-monospace,monospace}
 .rs{color:#555;font-size:13px;margin-bottom:10px}
+.rgb{margin:6px 0 10px}.rgb img{max-height:360px;object-fit:contain;background:#000}
 .two{display:flex;gap:14px}.hand{flex:1;min-width:0}
 .hh{font-size:13px;margin-bottom:2px}
 .ct{font-size:12.5px;color:#444;background:#fafafa;border-left:3px solid #ddd;padding:4px 8px;margin-bottom:5px;min-height:2.2em}

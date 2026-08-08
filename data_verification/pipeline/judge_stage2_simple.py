@@ -20,30 +20,30 @@ from simple_verifier_common import WorkItem, verifier_main
 
 
 AXIS = "stage2"
-VERSION = "qwen3vl-stage2-contact-v13.6-anchored"
+VERSION = "qwen3vl-stage2-contact-v14.2-camera-aligned"
 
 # Human-confirmed visual calibration examples. The runner may attach their existing composite
 # renders to the prompt; these labels are never converted into pixel statistics or thresholds.
 VISUAL_ANCHORS = [
     {
-        "sample_id": "58fff2344f5045968974ea2d485625e8/q4_expand_the_opening_for_foot_entry",
+        "sample_id": "2c6cca23925c449cab735b60d6e34cf3/q1_rotate_the_adjustment_knob",
         "score": 2,
-        "note": "stable upper/lower shoe contact regions; internal point noise does not erase them",
+        "note": "a small knob contact is complete because it repeats as one stable compact footprint on the knob, not merely because it hits the target",
     },
     {
-        "sample_id": "6bf8e590522e49659d40c4d2a52b41ca/q3_adjust_the_lectern_angle",
+        "sample_id": "c69723cebddc4657a850f3aa93b781db/q0_pick_up_the_barrel",
         "score": 2,
-        "note": "stable top and column regions across views",
+        "note": "large opposing wall fields are complete because each remains one stable, recognizable contact region across views",
     },
     {
-        "sample_id": "7bbd31f280034a519db0f07c08d7bfa7/q2_tilt_the_jug_for_pouring",
+        "sample_id": "bae6c2702e924be1a86528e28ef41201/q3_close_the_red_latch",
         "score": 2,
-        "note": "recognizable upper grasp and lower support regions",
+        "note": "orange consistently follows the same latch; view-dependent separation and occlusion do not make one physical contact fragmented",
     },
     {
-        "sample_id": "b3f0fba05f264d7f893ab81a088b9328/q3_open_the_lid",
+        "sample_id": "16f84b21656c427da7c7213aadb8d902/q1_slide_the_curtain_fabric_along_the_curta",
         "score": 2,
-        "note": "a small rim band and broad wall support are both formed contacts",
+        "note": "the narrow teal projections correspond to one continuous curtain rod in the matched RGB views",
     },
     {
         "sample_id": "5951a136f06d4212b9b833b58fed219b/q2_open_the_drawer",
@@ -51,24 +51,19 @@ VISUAL_ANCHORS = [
         "note": "task-related colour, but at least one hand lacks a stable formed region",
     },
     {
-        "sample_id": "c3a50e99ae574d97a711bfb56a434179/q4_close_the_book",
+        "sample_id": "7b38d99ed20549c7975fcb3948387238/q2_tilt_the_mug_for_pouring",
         "score": 1,
-        "note": "task-related colour, but the probability structure is visibly unformed",
-    },
-    {
-        "sample_id": "de516e7330e1491fac4144e3d2f458f1/q3_stretch_the_mask_opening",
-        "score": 1,
-        "note": "task-related colour, but at least one field lacks a stable cross-view shape",
-    },
-    {
-        "sample_id": "fa8b4476c1b14c9d9aceef6979d21428/q2_open_the_wicker_basket_lid",
-        "score": 1,
-        "note": "correct regions, but at least one probability field is not well formed",
+        "note": "orange reaches the correct handle, but disconnected glints only indicate its location and do not form a stable contact footprint",
     },
     {
         "sample_id": "7c16c7ed67cd4315a23d6e8f2d2060cc/q1_rotate_the_control_knobs",
         "score": 0,
         "note": "one hand has no visible prediction",
+    },
+    {
+        "sample_id": "c5da4115ea894a689c645fc414481aea/q0_pick_up_the_teapot",
+        "score": 0,
+        "note": "orange is visibly formed but severely misses the handle and instead targets the functionally unrelated lid knob",
     },
 ]
 
@@ -127,11 +122,12 @@ absent and scores 0.
 
 2. FIELD FORMATION. Before using the task wording, judge only the probability structure in the
 images. Start with the bright high-probability core and use dimmer support only to understand its
-shape. A complete field has dominant bright structure that forms a stable, recognizable 3D contact
-region across views, with support extending it smoothly. Use incomplete when bright structure breaks
-into unrelated islands, jumps between structures, changes location across views, or never settles
-into a recognizable shape. Sparse points, black points, holes, approximate boundaries, and region
-area are not quality measures by themselves; judge whether the probability mass as a whole is formed.
+shape. Judge coherence at the scale of the claimed physical contact: the probability mass is complete
+when it collectively forms one stable, recognizable, usable 3D contact region across views, and
+incomplete when it remains disconnected evidence from which no single contact region takes shape.
+This definition is scale-invariant: the formed region may be a tiny control, a narrow edge, or a broad
+surface. Sparse points, black points, holes, approximate boundaries, and absolute region area are not
+quality measures by themselves; judge the organization of the probability field as a whole.
 
 Do not let a correct target excuse an unformed field, and do not use the contact description to
 imagine a shape that is not visually present.
@@ -172,7 +168,7 @@ Make the localization and completeness observations for each hand independently 
 Report in this order:
 orange_present: Is there any orange at all in the FIRST picture, in any of its eight views? Decide this by looking, before you read the claim again.
 teal_present: The same for teal in the SECOND picture.
-orange_shape: complete when the heatmap forms a smooth coherent contact region; incomplete when it
+orange_shape: complete when the heatmap forms a stable coherent contact region; incomplete when it
 is visibly unformed; absent when no contact shape is visible. Decide from image structure alone.
 teal_shape: the same for teal.
 orange_alignment: clear_hit, partial_hit, or severe_miss against hand A's instructed contact.
@@ -185,7 +181,7 @@ reason: ONE short sentence. Do not walk through the views.""",
 
 The first picture is hand A's map, the second is hand B's.
 
-2  Each hand has a clear localization hit and a smooth, coherent contact region.
+2  Each hand has a clear localization hit and a well-formed, coherent contact region.
 1  Localization is usable, but at least one heatmap is visibly fragmented or incoherent.
 0  A hand is nearly absent or its main bright region severely misses the instructed contact.
 
@@ -237,7 +233,7 @@ Return JSON only:
 The first picture is hand A's map, the second is hand B's. Neither hand has been found to clearly
 lack a usable contact.
 
-Answer one question: does each hand clearly hit its instructed contact with a smooth, coherent
+Answer one question: does each hand clearly hit its instructed contact with a well-formed, coherent
 contact region?
 
 """ + _CONTACT + """

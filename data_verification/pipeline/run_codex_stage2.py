@@ -27,6 +27,13 @@ from simple_verifier_common import read_jsonl
 
 
 DEFAULT_MODEL = "gpt-5.6-sol"
+ANCHOR_CALIBRATION = "visual-anchors-v7-camera-aligned"
+
+
+def image_paths(item: Any) -> tuple[str, ...]:
+    return item.image_path if isinstance(item.image_path, tuple) else (item.image_path,)
+
+
 def result_schema(sample_ids: list[str]) -> dict[str, Any]:
     item = {
         "type": "object",
@@ -69,9 +76,9 @@ def batch_key(sample_ids: list[str], input_format: str, anchored: bool = False) 
     stem = f"{sample_ids[0].split('/')[0]}__n{len(sample_ids)}__{digest}"
     # Preserve the original split-run key so the completed two-image calls remain resumable.  The
     # composite prefix makes the controlled-comparison cache a distinct namespace.
-    if input_format == "composite":
-        stem = f"composite__{stem}"
-    return f"anchored__{stem}" if anchored else stem
+    if input_format != "split":
+        stem = f"{input_format.replace('-', '_')}__{stem}"
+    return f"{ANCHOR_CALIBRATION}__{stem}" if anchored else stem
 
 
 def validate_results(value: Any, sample_ids: list[str]) -> list[dict[str, Any]]:
@@ -131,6 +138,26 @@ def composite_rubric() -> str:
     return prompt.replace("FIRST picture", "TOP half").replace("SECOND picture", "BOTTOM half")
 
 
+def rgb_composite_rubric(aligned: bool) -> str:
+    reference = """For each sample, the RGB reference and heatmap composite contain the same selected
+views in the same positions. Use RGB only to understand geometry, physical-part identity,
+occlusion, and cross-view correspondence. Judge prediction presence, strength, and quality only
+from the heatmap. Apparent separation caused by viewpoint, self-occlusion, thin geometry, or the
+contact sheet layout is not fragmentation. A field is incomplete only when correspondence across
+the matched views shows that its probability mass does not form one physical contact region.
+""" if aligned else """The RGB reference identifies object geometry and parts, but its camera
+poses are not panel-aligned with the heatmap. Do not compare panels position by position or infer
+fragmentation from their apparent view correspondence. Judge prediction quality from the heatmap.
+"""
+    base = composite_rubric()
+    if aligned:
+        base = (base.replace("same eight viewpoints", "same selected viewpoints")
+                    .replace("The eight views together", "The selected views together")
+                    .replace("in any of its eight views", "in any shown view")
+                    .replace("shown from eight\nviewpoints", "shown from the selected matched\nviewpoints"))
+    return reference + "\n" + base
+
+
 def make_prompt(items: list[Any], input_format: str,
                 anchors: list[tuple[Any, dict[str, Any]]] | None = None) -> str:
     if input_format == "composite":
@@ -139,6 +166,14 @@ def make_prompt(items: list[Any], input_format: str,
             "half is orange hand A and its BOTTOM half is teal hand B."
         )
         rubric = composite_rubric()
+    elif input_format in ("rgb-composite", "rgb-aligned-composite"):
+        aligned = input_format == "rgb-aligned-composite"
+        layout = (
+            f"Evaluate {len(items)} independent samples. Each sample has two images: first an RGB "
+            "multi-view geometry reference, then a heatmap composite with hand A orange on TOP and "
+            f"hand B teal on BOTTOM. The panel positions {'correspond exactly' if aligned else 'are not camera-aligned'}."
+        )
+        rubric = rgb_composite_rubric(aligned)
     else:
         layout = (
             f"Evaluate {len(items)} independent samples. The attached images are ordered as A then B "
@@ -148,20 +183,33 @@ def make_prompt(items: list[Any], input_format: str,
     lines = [
         "Act only as the visual heatmap judge below. Do not inspect files, run tools, or discuss the repository.",
     ]
+    anchor_offset = sum(len(image_paths(anchor)) for anchor, _spec in (anchors or []))
     if anchors:
+        anchor_layout = (
+            f"The first {anchor_offset} attached images are {len(anchors)} labeled calibration "
+            "pairs, each ordered RGB reference then A/B heatmap composite."
+            if input_format in ("rgb-composite", "rgb-aligned-composite") else
+            f"The first {anchor_offset} attached images are {len(anchors)} labeled visual calibration anchors."
+        )
         lines.extend([
-            (f"The first {len(anchors)} attached images are labeled visual calibration anchors. "
-             "Each is a split composite with hand A orange on TOP and hand B teal on BOTTOM."),
+            anchor_layout,
             "Use them only to calibrate the visual meaning of good, ok, and bad. Do not return results for anchors.",
             "No numerical property is supplied or implied by these anchors; compare visual probability-field structure.",
             "",
             "VISUAL CALIBRATION ANCHORS:",
         ])
+        next_image = 1
         for index, (anchor, spec) in enumerate(anchors, 1):
+            count = len(image_paths(anchor))
+            image_label = (
+                f"images {next_image} and {next_image + 1} (RGB, then heatmap)"
+                if count == 2 else f"image {next_image}"
+            )
             lines.append(
-                f"Anchor image {index}: overall {spec['score']} ({['bad', 'ok', 'good'][spec['score']]}); "
+                f"Anchor {index}, {image_label}: overall {spec['score']} ({['bad', 'ok', 'good'][spec['score']]}); "
                 f"{spec['note']}; sample_id={anchor.sample_id}"
             )
+            next_image += count
         lines.append("")
     lines.extend([
         layout,
@@ -173,12 +221,13 @@ def make_prompt(items: list[Any], input_format: str,
         "CANDIDATE SAMPLES AND IMAGE ORDER:",
     ])
     for i, item in enumerate(items, 1):
-        anchor_offset = len(anchors or [])
-        image_order = (
-            f"attached image {anchor_offset + i} (A on top, B on bottom)"
-            if input_format == "composite" else
-            f"attached images {anchor_offset + 2*i-1} and {anchor_offset + 2*i}"
-        )
+        start = anchor_offset + sum(len(image_paths(previous)) for previous in items[:i - 1]) + 1
+        if input_format == "composite":
+            image_order = f"attached image {start} (A on top, B on bottom)"
+        elif input_format in ("rgb-composite", "rgb-aligned-composite"):
+            image_order = f"attached images {start} and {start + 1} (RGB, then A/B heatmap)"
+        else:
+            image_order = f"attached images {start} and {start + 1} (A, then B)"
         lines.extend([
             f"Sample {i}; {image_order}; sample_id={item.sample_id}",
             item.user_text,
@@ -231,10 +280,10 @@ def run_batch(
                 "--output-last-message", str(answer_path), "--cd", str(repo),
             ]
             for anchor, _spec in anchors:
-                cmd.extend(["--image", anchor.image_path])
+                for path in image_paths(anchor):
+                    cmd.extend(["--image", path])
             for item in items:
-                paths = item.image_path if isinstance(item.image_path, tuple) else (item.image_path,)
-                for path in paths:
+                for path in image_paths(item):
                     cmd.extend(["--image", path])
             cmd.append("-")
             try:
@@ -286,10 +335,13 @@ def write_labels(path: Path, manifest_rows: list[dict[str, Any]], results: dict[
             "teal_shape": row["teal_shape"],
             "model": model,
             "prompt_version": VERSION,
-            "prompt_calibration": "visual-anchors-v1" if anchored else "none",
-            "render_scheme": ("split-composite-bright-color-tau0.15"
-                              if input_format == "composite" else
-                              "split-per-hand-bright-color-tau0.15"),
+            "prompt_calibration": ANCHOR_CALIBRATION if anchored else "none",
+            "render_scheme": ({
+                "composite": "split-composite-bright-color-tau0.15",
+                "rgb-composite": "rgb-reference-plus-split-composite-bright-color-tau0.15",
+                "rgb-aligned-composite": "camera-aligned-rgb-plus-projected-split-composite-bright-color-tau0.15",
+                "split": "split-per-hand-bright-color-tau0.15",
+            }[input_format]),
         }
         lines.append(json.dumps(record, ensure_ascii=False))
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -303,8 +355,9 @@ def main() -> None:
     parser.add_argument("--out", required=True, help="new JSONL label file; existing gold is never read or changed")
     parser.add_argument("--run-dir", required=True, help="durable batch response/cache directory")
     parser.add_argument("--model", default=DEFAULT_MODEL)
-    parser.add_argument("--input-format", choices=["composite", "split"], default="split",
-                        help="composite uses one heat_png per sample (A top/B bottom); split uses A/B files")
+    parser.add_argument("--input-format",
+                        choices=["composite", "rgb-composite", "rgb-aligned-composite", "split"],
+                        default="split", help="rgb-aligned-composite requires exact-camera aligned fields")
     parser.add_argument("--batch-size", type=int, default=5)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--retries", type=int, default=4)
@@ -349,12 +402,28 @@ def main() -> None:
             raise SystemExit(f"visual anchors missing from manifest: {missing}")
         for spec in VISUAL_ANCHORS:
             row = manifest_by_id[spec["sample_id"]]
-            anchor = replace(build_item(row), image_path=row["heat_png"])
+            if args.input_format == "rgb-aligned-composite":
+                paths = (row["rgb_png_aligned"], row["heat_png_aligned"])
+            elif args.input_format == "rgb-composite":
+                paths = (row["rgb_png"], row["heat_png"])
+            else:
+                paths = row["heat_png"]
+            anchor = replace(build_item(row), image_path=paths)
             anchors.append((anchor, spec))
     items = [build_item(row) for row in manifests]
     if args.input_format == "composite":
         # WorkItem is frozen; keep the exact claims from build_item and replace only its image input.
         items = [replace(item, image_path=row["heat_png"]) for item, row in zip(items, manifests)]
+    elif args.input_format == "rgb-composite":
+        items = [replace(item, image_path=(row["rgb_png"], row["heat_png"]))
+                 for item, row in zip(items, manifests)]
+    elif args.input_format == "rgb-aligned-composite":
+        missing_aligned = [row["sample_id"] for row in manifests
+                           if not row.get("rgb_png_aligned") or not row.get("heat_png_aligned")]
+        if missing_aligned:
+            raise SystemExit(f"aligned renders missing for {len(missing_aligned)} candidates")
+        items = [replace(item, image_path=(row["rgb_png_aligned"], row["heat_png_aligned"]))
+                 for item, row in zip(items, manifests)]
     batches = [items[i:i + args.batch_size] for i in range(0, len(items), args.batch_size)]
     batch_dir = Path(args.run_dir) / "batches"
     batch_dir.mkdir(parents=True, exist_ok=True)
@@ -395,7 +464,7 @@ def main() -> None:
         "model": args.model,
         "prompt_version": VERSION,
         "input_format": args.input_format,
-        "prompt_calibration": "visual-anchors-v1" if anchors else "none",
+        "prompt_calibration": ANCHOR_CALIBRATION if anchors else "none",
         "samples": len(items),
         "batch_size": args.batch_size,
         "score_distribution": {
