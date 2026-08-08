@@ -27,7 +27,7 @@ from simple_verifier_common import read_jsonl
 
 
 DEFAULT_MODEL = "gpt-5.6-sol"
-ANCHOR_CALIBRATION = "visual-anchors-v7-camera-aligned"
+ANCHOR_CALIBRATION = "visual-anchors-v15-formation-first"
 
 
 def image_paths(item: Any) -> tuple[str, ...]:
@@ -42,18 +42,19 @@ def result_schema(sample_ids: list[str]) -> dict[str, Any]:
             "sample_id": {"type": "string", "enum": sample_ids},
             "orange_present": {"type": "boolean"},
             "teal_present": {"type": "boolean"},
-            "orange_shape": {"type": "string", "enum": ["complete", "incomplete", "absent"]},
-            "teal_shape": {"type": "string", "enum": ["complete", "incomplete", "absent"]},
-            "orange_alignment": {"type": "string",
-                                 "enum": ["clear_hit", "partial_hit", "severe_miss"]},
-            "teal_alignment": {"type": "string",
-                               "enum": ["clear_hit", "partial_hit", "severe_miss"]},
+            "orange_formation": {"type": "integer", "enum": [1, 2, 3, 4, 5]},
+            "teal_formation": {"type": "integer", "enum": [1, 2, 3, 4, 5]},
+            "orange_task_fit": {"type": "string",
+                                "enum": ["consistent", "ambiguous", "inconsistent"]},
+            "teal_task_fit": {"type": "string",
+                              "enum": ["consistent", "ambiguous", "inconsistent"]},
             "hand_A": {"type": "integer", "enum": [0, 1, 2]},
             "hand_B": {"type": "integer", "enum": [0, 1, 2]},
             "reason": {"type": "string"},
         },
-        "required": ["sample_id", "orange_present", "teal_present", "orange_shape", "teal_shape",
-                     "orange_alignment", "teal_alignment", "hand_A", "hand_B",
+        "required": ["sample_id", "orange_present", "teal_present",
+                     "orange_formation", "teal_formation",
+                     "orange_task_fit", "teal_task_fit", "hand_A", "hand_B",
                      "reason"],
     }
     return {
@@ -78,7 +79,8 @@ def batch_key(sample_ids: list[str], input_format: str, anchored: bool = False) 
     # composite prefix makes the controlled-comparison cache a distinct namespace.
     if input_format != "split":
         stem = f"{input_format.replace('-', '_')}__{stem}"
-    return f"{ANCHOR_CALIBRATION}__{stem}" if anchored else stem
+    prompt_key = hashlib.sha256(f"{VERSION}\n{ANCHOR_CALIBRATION}".encode()).hexdigest()[:8]
+    return f"{ANCHOR_CALIBRATION}__p{prompt_key}__{stem}" if anchored else f"p{prompt_key}__{stem}"
 
 
 def validate_results(value: Any, sample_ids: list[str]) -> list[dict[str, Any]]:
@@ -95,11 +97,11 @@ def validate_results(value: Any, sample_ids: list[str]) -> list[dict[str, Any]]:
         row = by_id[sid]
         if type(row.get("orange_present")) is not bool or type(row.get("teal_present")) is not bool:
             raise ValueError(f"{sid}: invalid presence booleans")
-        for field in ("orange_alignment", "teal_alignment"):
-            if row.get(field) not in ("clear_hit", "partial_hit", "severe_miss"):
+        for field in ("orange_task_fit", "teal_task_fit"):
+            if row.get(field) not in ("consistent", "ambiguous", "inconsistent"):
                 raise ValueError(f"{sid}: invalid {field}={row.get(field)!r}")
-        for field in ("orange_shape", "teal_shape"):
-            if row.get(field) not in ("complete", "incomplete", "absent"):
+        for field in ("orange_formation", "teal_formation"):
+            if type(row.get(field)) is not int or row[field] not in (1, 2, 3, 4, 5):
                 raise ValueError(f"{sid}: invalid {field}={row.get(field)!r}")
         for key in MULTI_AXES:
             if type(row.get(key)) is not int or row[key] not in (0, 1, 2):
@@ -110,16 +112,20 @@ def validate_results(value: Any, sample_ids: list[str]) -> list[dict[str, Any]]:
             raise ValueError(f"{sid}: orange absent but hand_A is nonzero")
         if not row["teal_present"] and row["hand_B"] != 0:
             raise ValueError(f"{sid}: teal absent but hand_B is nonzero")
-        def derived(present, alignment, shape):
-            if not present or alignment == "severe_miss" or shape == "absent":
+        if not row["orange_present"] and row["orange_formation"] != 1:
+            raise ValueError(f"{sid}: orange absent but formation is not 1")
+        if not row["teal_present"] and row["teal_formation"] != 1:
+            raise ValueError(f"{sid}: teal absent but formation is not 1")
+        def derived(present, formation, task_fit):
+            if not present or formation == 1 or task_fit == "inconsistent":
                 return 0
-            return 2 if alignment == "clear_hit" and shape == "complete" else 1
-        if row["hand_A"] != derived(row["orange_present"], row["orange_alignment"],
-                                    row["orange_shape"]):
-            raise ValueError(f"{sid}: hand_A disagrees with alignment/shape")
-        if row["hand_B"] != derived(row["teal_present"], row["teal_alignment"],
-                                    row["teal_shape"]):
-            raise ValueError(f"{sid}: hand_B disagrees with alignment/shape")
+            return 2 if formation >= 4 and task_fit == "consistent" else 1
+        if row["hand_A"] != derived(row["orange_present"], row["orange_formation"],
+                                    row["orange_task_fit"]):
+            raise ValueError(f"{sid}: hand_A disagrees with formation/task fit")
+        if row["hand_B"] != derived(row["teal_present"], row["teal_formation"],
+                                    row["teal_task_fit"]):
+            raise ValueError(f"{sid}: hand_B disagrees with formation/task fit")
         ordered.append(row)
     return ordered
 
@@ -143,8 +149,8 @@ def rgb_composite_rubric(aligned: bool) -> str:
 views in the same positions. Use RGB only to understand geometry, physical-part identity,
 occlusion, and cross-view correspondence. Judge prediction presence, strength, and quality only
 from the heatmap. Apparent separation caused by viewpoint, self-occlusion, thin geometry, or the
-contact sheet layout is not fragmentation. A field is incomplete only when correspondence across
-the matched views shows that its probability mass does not form one physical contact region.
+contact sheet layout is not fragmentation. Evaluate formation locally on a task-valid candidate,
+not across the whole same-colour field.
 """ if aligned else """The RGB reference identifies object geometry and parts, but its camera
 poses are not panel-aligned with the heatmap. Do not compare panels position by position or infer
 fragmentation from their apparent view correspondence. Judge prediction quality from the heatmap.
@@ -329,10 +335,10 @@ def write_labels(path: Path, manifest_rows: list[dict[str, Any]], results: dict[
             "fault": fault,
             "orange_present": row["orange_present"],
             "teal_present": row["teal_present"],
-            "orange_alignment": row["orange_alignment"],
-            "teal_alignment": row["teal_alignment"],
-            "orange_shape": row["orange_shape"],
-            "teal_shape": row["teal_shape"],
+            "orange_formation": row["orange_formation"],
+            "teal_formation": row["teal_formation"],
+            "orange_task_fit": row["orange_task_fit"],
+            "teal_task_fit": row["teal_task_fit"],
             "model": model,
             "prompt_version": VERSION,
             "prompt_calibration": ANCHOR_CALIBRATION if anchored else "none",
@@ -367,6 +373,8 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--visual-anchors", action="store_true",
                         help="attach the human-labeled visual anchors declared by the judge prompt")
+    parser.add_argument("--exclude-visual-anchor-candidates", action="store_true",
+                        help="exclude anchor IDs from candidate rows after offset, before limit")
     parser.add_argument("--sample-id", action="append", default=[],
                         help="judge only this exact sample_id; repeat for a targeted recheck")
     args = parser.parse_args()
@@ -392,6 +400,9 @@ def main() -> None:
             raise SystemExit(f"unknown --sample-id values: {sorted(wanted - found)}")
     if args.offset:
         manifests = manifests[args.offset:]
+    if args.exclude_visual_anchor_candidates:
+        anchor_ids = {spec["sample_id"] for spec in VISUAL_ANCHORS}
+        manifests = [row for row in manifests if row["sample_id"] not in anchor_ids]
     if args.limit:
         manifests = manifests[:args.limit]
     anchors: list[tuple[Any, dict[str, Any]]] = []

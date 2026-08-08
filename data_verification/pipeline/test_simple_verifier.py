@@ -135,6 +135,25 @@ class SimpleVerifierTests(unittest.TestCase):
         self.assertIn("rgb_aligned_composite__",
                       codex_s2.batch_key([item.sample_id], "rgb-aligned-composite", True))
 
+    def test_stage2_explicit_formation_mapping_is_enforced(self):
+        sid = "object/task"
+        row = {
+            "sample_id": sid,
+            "orange_present": True,
+            "teal_present": True,
+            "orange_formation": 4,
+            "teal_formation": 5,
+            "orange_task_fit": "consistent",
+            "teal_task_fit": "consistent",
+            "hand_A": 2,
+            "hand_B": 2,
+            "reason": "orange is mostly formed; teal is clean",
+        }
+        self.assertEqual(codex_s2.validate_results({"results": [row]}, [sid]), [row])
+        wrong = dict(row, hand_A=1)
+        with self.assertRaises(ValueError):
+            codex_s2.validate_results({"results": [wrong]}, [sid])
+
 
 if __name__ == "__main__":
     unittest.main()

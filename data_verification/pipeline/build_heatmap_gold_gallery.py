@@ -73,6 +73,8 @@ def main():
                     help="show the aligned multi-view RGB geometry reference above each heatmap pair")
     ap.add_argument("--aligned", action="store_true",
                     help="use rgb_png_aligned and heat_png_{A,B}_aligned from the manifest")
+    ap.add_argument("--task-only", action="store_true",
+                    help="hide intermediate per-hand contact claims not supplied to a task-only judge")
     ap.add_argument("--per-page", type=int, default=100)
     a = ap.parse_args()
     D, base = a.dir, os.path.dirname(os.path.abspath(a.out))
@@ -104,8 +106,10 @@ def main():
             "f": g.get("fault", "none"), "r": g.get("reason", ""),
             "ca": f'{ra["role"]} @ {ra["contact_region"]}',
             "cb": f'{rb["role"]} @ {rb["contact_region"]}',
-            "aa": g.get("orange_alignment", ""), "ba": g.get("teal_alignment", ""),
-            "ash": g.get("orange_shape", ""), "bsh": g.get("teal_shape", ""),
+            "aa": g.get("orange_task_fit", g.get("orange_alignment", "")),
+            "ba": g.get("teal_task_fit", g.get("teal_alignment", "")),
+            "ash": g.get("orange_formation", g.get("orange_shape", "")),
+            "bsh": g.get("teal_formation", g.get("teal_shape", "")),
             "na": na, "nb": nb, "pa": 100 * na / n, "pb": 100 * nb / n,
             "ir": rel(m[rgb_key], base),
             "ia": rel(m[heat_a_key], base), "ib": rel(m[heat_b_key], base),
@@ -116,12 +120,14 @@ def main():
         def half(tag, colour, score, contact, img, npts, pct, alignment, shape):
             quality = ""
             if alignment or shape:
-                quality = f'<div class="quality">{html.escape(alignment)} · {html.escape(shape)}</div>'
+                quality = (f'<div class="quality">task={html.escape(str(alignment))} · '
+                           f'formation={html.escape(str(shape))}</div>')
+            contact_html = "" if a.task_only else f'<div class="ct">{html.escape(contact)}</div>'
             return f"""<div class="hand">
   <div class="hh"><b>{tag}</b> <span class="sw {colour}"></span>
     <span class="pill s{score}">gold {score}</span>
     <span class="pts">{npts} pts &middot; {pct:.2f}%</span></div>
-  <div class="ct">{html.escape(contact)}</div>
+  {contact_html}
   {quality}<img loading="lazy" src="{img}"></div>"""
         rgb = (f'<div class="rgb"><div class="quality">RGB geometry reference · matched views</div>'
                f'<img loading="lazy" src="{r["ir"]}"></div>' if a.show_rgb else "")
@@ -181,9 +187,12 @@ select{font-size:13px;padding:2px 4px}
              f'<a href="{first_name if i == 0 else f"{stem}_p{i+1}.html"}">{i+1}</a>')
             for i in range(n)) + "</div>"
 
+    rubric_caption = ("candidate formation first; joint task consistency second; overall = min(A,B)"
+                      if a.task_only else
+                      "localization first; target-relative shape completeness second; overall = min(A,B)")
     head = f"""<!doctype html><meta charset="utf-8"><title>heatmap verification</title><style>{css}</style>
 <h1>Heatmap verification &mdash; per-hand scores on the split renders
-<span class="dim">(localization first; target-relative shape completeness second; overall = min(A,B))</span></h1>
+<span class="dim">({rubric_caption})</span></h1>
 <div class="summary">
 judge: <code>{html.escape(provenance)}</code><br>
 overall 0/1/2 = <code>{dist[0]}/{dist[1]}/{dist[2]}</code>&nbsp;&nbsp;
@@ -191,8 +200,8 @@ hand A = <code>{da[0]}/{da[1]}/{da[2]}</code>&nbsp;&nbsp;hand B = <code>{db[0]}/
 <div class="bar">{bar(dist)}</div>
 faults: {", ".join(f"<code>{k}</code> {v}" for k, v in faults.most_common())}<br>
 <span class="dim">"pts" is how many point-cloud points that hand marks; it is displayed for review,
-not used as a quality threshold. Scores come from the visual judge's precision-first,
-target-relative completeness rubric.</span>
+not used as a quality threshold. Scores come from the visual judge's probability-field and
+task-consistency rubric.</span>
 </div>
 <div class="controls">overall <select id="fo"><option value="">all</option>
 <option value="0">bad</option><option value="1">ok</option><option value="2">good</option></select>
