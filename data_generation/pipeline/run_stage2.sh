@@ -11,6 +11,11 @@
 set -u
 GPU=$1; START=$2; END=$3; IN=$4; MAP=$5; OUT=$6; TRIES=${7:-8}
 GM=${GPU_MEM:-0.5}   # vLLM gpu_memory_utilization; raise on smaller cards for more KV cache
+# REPLAY_POINTS=<dir> regenerates from a frozen point archive instead of running
+# Molmo (see extract_stage2_points.py). GPU_MEM is then unused: no vLLM is loaded.
+REPLAY=${REPLAY_POINTS:-}
+REPLAY_ARG=()
+[ -n "$REPLAY" ] && REPLAY_ARG=(--replay_points "$REPLAY")
 DG=/home/michaellee/mclee/affogato/data_generation
 PY=$HOME/miniconda3/envs/molmo/bin/python
 cd "$DG" || exit 1
@@ -22,7 +27,7 @@ for ((t = 1; t <= TRIES; t++)); do
   "$PY" pipeline/stage2_v2.py \
       --stage1 "$IN" --mapping "$MAP" --output_dir "$OUT" \
       --start "$START" --end "$END" --gpu "$GPU" \
-      --gpu_mem "$GM" --sam_chunk 20 --skip_existing \
+      --gpu_mem "$GM" --sam_chunk 20 --skip_existing "${REPLAY_ARG[@]}" \
       >> "$OUT/run_gpu${GPU}_${START}_${END}.log" 2>&1 && {
     echo "[$(date '+%F %T')] DRIVER DONE gpu$GPU [$START:$END]" | tee -a "$LOG"
     exit 0

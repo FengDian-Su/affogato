@@ -28,13 +28,18 @@ and the retired MolmoPoint runner:
   pointing — Molmo declines natively per view and emits its first-token
   existence confidence, thresholded by --exist_thr (calibrated on 500
   objects); ADAPTIVE multi-point (uncapped: the model's own instance count
-  decides; one SAM mask per point, max-merged per role); 2D cross-role
+  decides; one SAM mask per point, consolidated per role/view); 2D cross-role
   overlap resolution before the vote (--overlap2d). scores.npz gains
   ptsA_multi/ptsB_multi ((M,3) rows vi,x,y — ALL Molmo points, pre-gate) and
   pexistA/pexistB ((T,) P(exist) per view), so the existence threshold can be
   re-applied post hoc in either direction. scoreA_raw/scoreB_raw are the
   votes after the consensus view-drop AND the 2D overlap resolution — "raw"
   now means only "before the 3D refine/partition chain".
+- 09-13 consolidation: conditional pixel-wise mean of soft scores > mask_tau
+  (default 0.1). The denominator counts contributing masks at EACH pixel,
+  not all K masks. Single masks also get the cutoff; absent slots contribute
+  nothing. --mask_consolidation iou_group retains the historical baseline.
+  Prompting, existence gating, consensus, 2D overlap and 3D finishing are unchanged.
 
 Run with the **molmo** conda env (vllm 0.16 + torch cu128 + SAM2 installed):
   ~/miniconda3/envs/molmo/bin/python pipeline/stage2_v2.py --start 0 --end 100 --gpu 3
@@ -51,8 +56,17 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_GEN = os.path.dirname(HERE)
 sys.path.insert(0, DATA_GEN)
 
+from single_region.mask_consolidation import DEFAULT_MASK_TAU, conditional_mean_masks
 
-def parse_args():
+
+def mask_tau_arg(value):
+    value = float(value)
+    if not np.isfinite(value) or not 0 <= value <= 1:
+        raise argparse.ArgumentTypeError("mask_tau must be finite and in [0, 1]")
+    return value
+
+
+def parse_args(argv=None):
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--stage1", default="outputs/stage1_v2/stage1_part0.json")
@@ -67,6 +81,14 @@ def parse_args():
                                                            # 40x1024^2 batch encode peaks >20GB,
                                                            # set 20 on <=48GB cards
     ap.add_argument("--skip_existing", action="store_true")
+    ap.add_argument("--replay_points", default=None,
+                    help="regenerate from a frozen point archive (extract_stage2_points.py) instead of "
+                         "running Molmo: <dir>/<object_id>.npz. Skips vLLM entirely; SAM2 still runs, "
+                         "because the per-point masks were never persisted (~40 TB for the full release)")
+    ap.add_argument("--mask_consolidation", choices=("conditional_mean", "iou_group"),
+                    default="conditional_mean", help="per-role/view SAM mask merger (default: conditional_mean)")
+    ap.add_argument("--mask_tau", type=mask_tau_arg, default=DEFAULT_MASK_TAU,
+                    help="strict soft-score cutoff for conditional_mean, distinct from existence/3D thresholds (default: 0.1)")
     # 07-18/19 recipe additions (each independently toggleable for ablation):
     ap.add_argument("--overlap2d", type=int, default=1)    # resolve A/B mask overlap per view
     ap.add_argument("--body_select", default="largest",
@@ -89,11 +111,139 @@ def parse_args():
     # kills 57% of hallucinated-target views on top of the ~54% native decline.
     # Raw scores are stored per view (pexistA/pexistB), so the threshold can be
     # re-applied later without re-inference.
-    return ap.parse_args()
+    return ap.parse_args(argv)
 
 
 def slugify(text, n=40):
     return "".join(c if c.isalnum() else "_" for c in text.lower())[:n].strip("_")
+
+
+def consolidation_settings(method, tau):
+    if method not in ("conditional_mean", "iou_group"):
+        raise ValueError(f"Unknown mask consolidation: {method}")
+    if not np.isfinite(tau) or not 0 <= tau <= 1:
+        raise ValueError("mask_tau must be finite and in [0, 1]")
+    return dict(consolidation=method,
+                consolidation_threshold=float(tau) if method == "conditional_mean" else None)
+
+
+def merge_sam_subqueries(heat_sub, sub_points, sub_owner, n_roles, image_shapes,
+                        method="conditional_mean", tau=DEFAULT_MASK_TAU):
+    """Reassemble slot outputs into independent role/view heatmaps.
+
+    Only slots carrying a positive point in this view are valid inputs.
+    Never reuse SAM's shared dummy zero buffer as an output or contributor.
+    """
+    consolidation_settings(method, tau)
+    n_views = len(image_shapes)
+    if not (len(heat_sub) == len(sub_points) == len(sub_owner)):
+        raise ValueError("SAM slot arrays have inconsistent lengths")
+    slots_of = [[] for _ in range(n_roles)]
+    for si, owner in enumerate(sub_owner):
+        if not 0 <= owner < n_roles or len(heat_sub[si]) != n_views or len(sub_points[si]) != n_views:
+            raise ValueError("Invalid SAM slot owner or view count")
+        slots_of[owner].append(si)
+    if method == "iou_group":
+        from single_region.single_region_affordance import merge_instance_masks
+    out = []
+    for slots in slots_of:
+        row = []
+        for vi, shape in enumerate(image_shapes):
+            masks = [heat_sub[si][vi] for si in slots if len(sub_points[si][vi])]
+            if method == "conditional_mean":
+                row.append(conditional_mean_masks(masks, shape, tau))
+            else:
+                # Keep baseline mathematics but do not return aliased storage.
+                row.append(merge_instance_masks(masks).copy() if masks else np.zeros(shape, np.float32))
+        out.append(row)
+    return out
+
+
+def existing_object_is_complete(obj_out, queries, settings):
+    """Skip only compatible results; reject mixing consolidation recipes.
+
+    Check every existing metadata file, even if an earlier query is missing.
+    Historical outputs without a consolidation field used the IoU-group rule.
+    A mismatch requires a new output directory or intentional reprocessing
+    without --skip_existing; it must not silently skip or overwrite old data.
+    """
+    complete = True
+    for qi, query in queries:
+        qdir = os.path.join(obj_out, f"q{qi}_{slugify(query['task'])}")
+        meta_path = os.path.join(qdir, "meta.json")
+        scores_path = os.path.join(qdir, "scores.npz")
+        if not os.path.isfile(meta_path):
+            complete = False
+            continue
+        try:
+            with open(meta_path) as stream:
+                engine = json.load(stream)["engine"]
+            if not isinstance(engine, dict):
+                raise ValueError("engine must be an object")
+            method = engine.get("consolidation", "iou_group")
+            if method == "baseline":
+                method = "iou_group"
+            threshold = engine.get("consolidation_threshold") if method != "iou_group" else None
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            raise ValueError(f"Cannot verify existing recipe in {meta_path}; use a new output directory") from exc
+        if method != settings["consolidation"] or threshold != settings["consolidation_threshold"]:
+            raise ValueError(
+                f"Existing consolidation differs in {meta_path}: {method}, tau={threshold}; "
+                f"requested {settings['consolidation']}, tau={settings['consolidation_threshold']}. "
+                "Use a new --output_dir, or remove --skip_existing only for intentional reprocessing.")
+        complete = os.path.isfile(scores_path) and complete
+    return complete
+
+
+def load_replay_points(replay_dir, rec, queries, n_views, settings):
+    """Rebuild ground_queries' output from a frozen point archive.
+
+    Returns exactly what m2v.ground_queries returns — (per_query, p_exist),
+    both flat lists indexed i*2+r — so the caller cannot tell the difference
+    and every stage after the existence gate runs the original code.
+
+    The archive stores ptsA_multi/ptsB_multi as (M, 3) rows [view, x, y] in
+    the order the points were emitted, which is the order process_object
+    flattened them in, so grouping rows by view restores the per-view lists
+    point-for-point. pexist round-trips through NaN, which is the sentinel
+    the npz uses for the model's "no opinion" None.
+
+    Every mismatch is fatal rather than repaired: replaying a different view
+    count, a different existence threshold or another task's points would
+    silently produce a release that looks finished and is not comparable.
+    """
+    path = os.path.join(replay_dir, f"{rec['object_id']}.npz")
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"no archived points for {rec['object_id']}")
+    with np.load(path, allow_pickle=False) as z:
+        metas = json.loads(str(z["_meta"]))
+        per_query, p_exist = [], []
+        for qi, query in queries:
+            qdir = f"q{qi}_{slugify(query['task'])}"
+            meta = metas.get(qdir)
+            if meta is None:
+                raise KeyError(f"{rec['object_id']}: archive has no {qdir}")
+            if meta.get("task") != query["task"] or meta.get("roles") != query["roles"]:
+                raise ValueError(f"{rec['object_id']}/{qdir}: archived task/roles differ from stage1")
+            if meta.get("n_views") != n_views:
+                raise ValueError(f"{rec['object_id']}/{qdir}: archived n_views {meta.get('n_views')} "
+                                 f"!= {n_views} available now; renders changed since the source run")
+            engine = meta.get("engine", {})
+            for key in ("exist_thr", "body_select"):
+                if engine.get(key) != settings[key]:
+                    raise ValueError(f"{rec['object_id']}/{qdir}: archived {key}={engine.get(key)!r} "
+                                     f"!= requested {settings[key]!r}; the gate would not match the points")
+            for role in "AB":
+                multi = z[f"{qdir}/pts{role}_multi"]
+                pex = z[f"{qdir}/pexist{role}"]
+                if len(pex) != n_views:
+                    raise ValueError(f"{rec['object_id']}/{qdir}: pexist{role} has {len(pex)} views")
+                views = [[] for _ in range(n_views)]
+                for vi, x, y in multi:
+                    views[int(vi)].append([float(x), float(y)])
+                per_query.append(views)
+                p_exist.append([None if not np.isfinite(p) else float(p) for p in pex])
+    return per_query, p_exist
 
 
 NEG_MIN_PX = 30      # partner point becomes a SAM negative only beyond this distance
@@ -119,7 +269,8 @@ def expand_sam_subqueries(body_flags, sam_pts):
     """SAM jobs from the (gated) per-view point lists, one sub-query per point
     slot: slot s of flat role j prompts each view's s-th point separately
     (multi-instance targets need one mask per instance, not one multi-positive
-    blob); the caller max-merges slots back into the role's heatmaps.
+    blob); the caller consolidates valid slots per role/view using the selected
+    merger (conditional pixel-wise mean by default).
 
     Per sub-query: candidate selection (body target -> BODY_SELECT, the whole
     visible face; every other target -> best_iou) and the partner role's first
@@ -218,7 +369,8 @@ def process_object(rec, scene, canvas, queries, per_query, heatmaps_all, proj,
                        **recipe_flags},
             "seconds": round(time.time() - t0 + t_share, 1),
         }
-        json.dump(meta, open(os.path.join(qdir, "meta.json"), "w"), indent=1)
+        with open(os.path.join(qdir, "meta.json"), "w") as stream:
+            json.dump(meta, stream, indent=1)
         n_done += 1
     return n_done
 
@@ -232,9 +384,27 @@ def main():
     global BODY_SELECT
     BODY_SELECT = args.body_select
 
-    # heavy imports AFTER the GPU pin; vLLM engine BEFORE SAM2 (it profiles GPU memory)
-    from single_region.molmo2_vllm import engine as m2v
-    llm, proc = m2v.load_engine(gpu_memory_utilization=args.gpu_mem)
+    # Verify resume compatibility before allocating any model/GPU memory.
+    mask_settings = consolidation_settings(args.mask_consolidation, args.mask_tau)
+    with open(args.stage1) as stream:
+        recs = [r for r in json.load(stream) if not r.get("error")]
+    end = args.end if args.end is not None else len(recs)
+    todo = recs[args.start:end]
+    completed_objects = set()
+    if args.skip_existing:
+        for rec in todo:
+            queries = [(qi, q) for qi, q in enumerate(rec.get("queries", []))
+                       if len(q.get("roles", [])) == 2 and len(q.get("molmo_queries", [])) == 2]
+            if queries and existing_object_is_complete(os.path.join(args.output_dir, rec["object_id"]), queries, mask_settings):
+                completed_objects.add(rec["object_id"])
+
+    # heavy imports AFTER the GPU pin; vLLM engine BEFORE SAM2 (it profiles GPU memory).
+    # --replay_points reuses frozen points, so the engine is never imported at
+    # all and SAM2 gets the whole card instead of what gpu_mem left over.
+    llm = proc = m2v = None
+    if not args.replay_points:
+        from single_region.molmo2_vllm import engine as m2v
+        llm, proc = m2v.load_engine(gpu_memory_utilization=args.gpu_mem)
     from single_region import single_region_affordance as sra
     from single_region.single_region_affordance import (build_aff_map, resolve_object,
                                                         load_canvas, load_scene)
@@ -242,12 +412,10 @@ def main():
     cfg = sra.PipelineConfig()
     sam2_predictor = sra.load_sam2_model(cfg.sam2_checkpoint, cfg.sam2_model_cfg, cfg.device)
 
-    recs = [r for r in json.load(open(args.stage1)) if not r.get("error")]
     aff_map = build_aff_map(args.mapping)
-    end = args.end if args.end is not None else len(recs)
-    todo = recs[args.start:end]
     print(f"stage2_v2: {len(todo)} objects [{args.start}:{end}] "
-          f"views={args.num_views} -> {args.output_dir}", flush=True)
+          f"views={args.num_views} consolidation={args.mask_consolidation} "
+          f"mask_tau={mask_settings['consolidation_threshold']} -> {args.output_dir}", flush=True)
 
     n_done = n_skip = 0
     for oi, rec in enumerate(todo):
@@ -266,22 +434,22 @@ def main():
         if not queries:
             n_skip += 1
             continue
-        if args.skip_existing:
-            obj_out = os.path.join(args.output_dir, rec["object_id"])
-            # complete = every eligible query dir has both output files (a dir
-            # count would permanently skip an object interrupted mid-write)
-            if all(os.path.exists(os.path.join(obj_out, f"q{qi}_{slugify(q['task'])}", fn))
-                   for qi, q in queries for fn in ("scores.npz", "meta.json")):
-                n_skip += 1
-                continue
+        if args.skip_existing and rec["object_id"] in completed_objects:
+            n_skip += 1
+            continue
 
         t0 = time.time()
         try:
             canvas = load_canvas(aff_dir)
             scene = load_scene(obj_root, n_views)
-            # ONE generate for every query x both roles of this object
-            mqs_flat = [mq for _, q in queries for mq in q["molmo_queries"]]
-            per_query, p_exist = m2v.ground_queries(llm, proc, scene.view_images, mqs_flat)
+            if args.replay_points:
+                per_query, p_exist = load_replay_points(
+                    args.replay_points, rec, queries, n_views,
+                    dict(exist_thr=args.exist_thr, body_select=args.body_select))
+            else:
+                # ONE generate for every query x both roles of this object
+                mqs_flat = [mq for _, q in queries for mq in q["molmo_queries"]]
+                per_query, p_exist = m2v.ground_queries(llm, proc, scene.view_images, mqs_flat)
             # existence gate: SAM sees only views the model itself believes in
             # (see --exist_thr); per_query stays UNFILTERED so the npz records
             # every Molmo point + its score and the threshold can be re-applied
@@ -305,16 +473,12 @@ def main():
                 # list CONCATENATION, not array addition: each window returns
                 # this sub-query's heatmaps for its own views, appended in view order
                 heat_sub = hm if heat_sub is None else [a + b for a, b in zip(heat_sub, hm)]
-            # merge slot masks per role per view: same-instance masks average
-            # (consensus, no fringe inflation), distinct instances union
-            slots_of = [[] for _ in per_query]
-            for si, j in enumerate(sub_owner):
-                slots_of[j].append(si)
-            heatmaps_all = [
-                [sra.merge_instance_masks([heat_sub[si][vi] for si in slots
-                                           if len(sub_points[si][vi])] or [heat_sub[slots[0]][vi]])
-                 for vi in range(n_views)]
-                for slots in slots_of]
+            # Conditional mean over contributors at each pixel, independently
+            # per role/view; empty prompt slots never enter the denominator.
+            heatmaps_all = merge_sam_subqueries(
+                heat_sub, sub_points, sub_owner, len(per_query),
+                [image.shape[:2] for image in scene.view_images_np],
+                method=args.mask_consolidation, tau=args.mask_tau)
             proj = sra.precompute_projection(canvas.xyz_vote, scene.cameras, scene.K_list,
                                              scene.depth_maps, cfg.depth_tolerance)
             # consensus validation for NAMED-PART roles: vote once, then drop
@@ -372,7 +536,8 @@ def main():
                                  p_exist=p_exist,
                                  recipe_flags=dict(overlap2d=bool(args.overlap2d),
                                                    exist_thr=args.exist_thr,
-                                                   body_select=args.body_select))
+                                                   body_select=args.body_select,
+                                                   **mask_settings))
         except KeyboardInterrupt:
             raise
         except Exception as e:
