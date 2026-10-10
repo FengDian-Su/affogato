@@ -12,6 +12,7 @@ the model's label as is; the probabilities of the score token are only logged.
   run       python -m data_verification.quality_review.qwen_judge run --shard 0/2 [--axes heatmap] --out DIR
             (one GPU per shard: CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=0, and the gemma4
             env needs LD_LIBRARY_PATH=$CONDA/envs/gemma4/lib)
+            whole corpus: --manifest .../quality_review/corpus/manifest.jsonl --split all (corpus_manifest.py)
   evaluate  python -m data_verification.quality_review.qwen_judge evaluate --out DIR
 """
 
@@ -19,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from itertools import combinations
 import json
 import math
@@ -30,7 +32,7 @@ import time
 from typing import Any
 
 from data_verification.quality_review.app import (
-    DEFAULT_DB, DEFAULT_ROOT, axis_ratings, connect, krippendorff_alpha, score,
+    DEFAULT_DB, DEFAULT_ROOT, axis_ratings, connect, inspect_manifest, krippendorff_alpha, score,
 )
 
 MODEL, REVISION = "Qwen/Qwen3.8-27B", "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
@@ -232,11 +234,14 @@ def run(args: argparse.Namespace) -> None:
     from vllm import LLM, SamplingParams
     from vllm.sampling_params import StructuredOutputsParams
 
-    connection = connect(args.db)
-    try:
-        samples = connection.execute("SELECT * FROM samples ORDER BY sample_index").fetchall()
-    finally:
-        connection.close()
+    if args.manifest:       # pairs outside the review (corpus_manifest.py), in the review's row format
+        samples = inspect_manifest(args.manifest, seed=0, check_images=False)
+    else:
+        connection = connect(args.db)
+        try:
+            samples = connection.execute("SELECT * FROM samples ORDER BY sample_index").fetchall()
+        finally:
+            connection.close()
     index, count = (int(part) for part in args.shard.split("/"))
     samples = [sample for sample in samples if args.split in ("all", sample["split"])]
     samples = samples[index::count][: args.limit or None]
@@ -248,6 +253,7 @@ def run(args: argparse.Namespace) -> None:
     prompts = {axis: PROMPTS[axis] for axis in axes}
     (args.out / "config.json").write_text(json.dumps({
         "version": VERSION, "model": MODEL, "revision": REVISION,
+        "samples": str(args.manifest or args.db),
         "images": {"task": "8 original views, 512 px", "role": "8 original views, 512 px",
                    "heatmap": "object / Hand A / Hand B sheets, 512 px per view (renders_2x)"},
         "decoding": {"temperature": 0, "thinking": args.think, "logprobs": 10}, "system_prompts": prompts,
@@ -266,19 +272,22 @@ def run(args: argparse.Namespace) -> None:
     params = {axis: SamplingParams(temperature=0.0, max_tokens=8192 if args.think else 1024, logprobs=10,
                                    structured_outputs=StructuredOutputsParams(json=SCHEMAS[axis])) for axis in axes}
 
+    def load(paths: list[str]) -> list[Any]:
+        images = []
+        for path in paths:
+            with Image.open(path) as image:
+                images.append(image.convert("RGB"))   # transparent background -> black, as in the UI
+        return images
+
+    loader = ThreadPoolExecutor(16)                   # the views are on NFS: read a chunk's images in parallel
     started = time.time()
     for start in range(0, len(jobs), args.batch * 4):
         chunk = jobs[start:start + args.batch * 4]
-        requests = []
-        for sample, axis in chunk:
-            captions, paths = evidence(sample, axis)
-            images = []
-            for path in paths:
-                with Image.open(path) as image:
-                    images.append(image.convert("RGB"))   # transparent background -> black, as in the UI
-            requests.append({"prompt": chat_prompt(processor, prompts[axis], captions,
-                                                   case_text(sample, axis), args.think),
-                             "multi_modal_data": {"image": images}})
+        evidences = [evidence(sample, axis) for sample, axis in chunk]
+        requests = [{"prompt": chat_prompt(processor, prompts[axis], captions, case_text(sample, axis), args.think),
+                     "multi_modal_data": {"image": images}}
+                    for (sample, axis), (captions, _), images
+                    in zip(chunk, evidences, loader.map(load, [paths for _, paths in evidences]))]
         results = llm.generate(requests, [params[axis] for _, axis in chunk], use_tqdm=False)
         with out.open("a", encoding="utf-8") as stream:
             for (sample, axis), result in zip(chunk, results):
@@ -429,6 +438,8 @@ def main() -> None:
         command = sub.add_parser(name)
         command.add_argument("--db", type=Path, default=DEFAULT_DB)
         command.add_argument("--out", type=Path, default=DEFAULT_ROOT / "qwen38_27b" / VERSION)
+    sub.choices["run"].add_argument("--manifest", type=Path, default=None,
+                                    help="judge the pairs of this manifest instead of the review database's")
     sub.choices["run"].add_argument("--shard", default="0/1")
     sub.choices["run"].add_argument("--limit", type=int, default=0)
     sub.choices["run"].add_argument("--split", choices=("dev", "test", "all"), default="dev",

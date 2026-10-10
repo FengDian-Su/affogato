@@ -146,6 +146,9 @@ $PY -m data_verification.quality_review.render_hires          # full-resolution 
 CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=/home/michaellee/miniconda3/envs/gemma4/lib \
     $PY -m data_verification.quality_review.qwen_judge run --split all --shard 0/2
 $PY -m data_verification.quality_review.qwen_judge evaluate   # vs the raters -> <run>/evaluation.json
+# Whole corpus: the review manifest's rows for every released pair, then judge them.
+$PY -m data_verification.quality_review.corpus_manifest       # -> outputs/quality_review/corpus/manifest.jsonl
+... qwen_judge run --manifest data_verification/outputs/quality_review/corpus/manifest.jsonl --split all --axes task,role
 ```
 
 Result for v23 on all 1,000 pairs, measured on 2026-10-08 against the two raters who had finished:
