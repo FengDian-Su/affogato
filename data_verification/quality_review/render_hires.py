@@ -27,6 +27,15 @@ def render(row: dict) -> tuple[str, dict[str, str]]:
     return prepare.render(row, str(OUT), False)
 
 
+def sheets(row: dict) -> list:
+    """The same three sheets (object, Hand A, Hand B) in memory, pixel for pixel what render() writes.
+    The LLM judge draws them this way for pairs that were never rendered to disk."""
+    import render_aligned_heatmaps as renderer
+    renderer.CELL = CELL
+    made = prepare.sheets(row)
+    return [made[kind] for kind in ("rgb", "A", "B")]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--split", choices=("dev", "test", "all"), default="all")

@@ -151,16 +151,50 @@ $PY -m data_verification.quality_review.corpus_manifest       # -> outputs/quali
 ... qwen_judge run --manifest data_verification/outputs/quality_review/corpus/manifest.jsonl --split all --axes task,role
 ```
 
-Result for v23 on all 1,000 pairs, measured on 2026-10-08 against the two raters who had finished:
+Pairs without rendered review sheets (the corpus) get their heatmap sheets drawn in memory by a
+pool of render processes. The sheets are pixel-identical to the `render_hires.py` files, so the
+judge sees exactly what it saw on the 1,000 reviewed pairs.
 
-| Criterion | Judge | Raters |
-|---|---:|---:|
-| Task | 93.3 | 95.8 |
-| Role | 96.5 | 97.5 |
-| Heatmaps | 90.3 | 85.8 |
+### Running it on the whole corpus
 
-On every criterion, the judge's Gwet's AC1 with each rater is within .02 of the raters' AC1 with
-each other.
+`corpus_run/` holds the scripts for the long run. Its data and logs are in
+`outputs/quality_review/corpus/`.
+
+- `start_tmux.sh` starts tmux session `corpus_heatmap` with these windows:
+  - `shard0` and `shard1`: one supervisor per GPU (`run_corpus.sh`);
+  - `monitor`: `monitor.sh`;
+  - `status`: `status.sh`.
+- **Supervisor** (`run_corpus.sh`):
+  - resumes from its shard file;
+  - restarts its attempt after a crash;
+  - shares the GPU with other users' jobs, waiting until there is room for its setting;
+  - a file `PAUSE_shard<N>` stops it from restarting.
+  - On GPU0 it also hands the GPU over when `robocasa_rc/REQUEST_GPU0` appears.
+- **Monitor** (`monitor.sh`):
+  - restarts a stalled attempt;
+  - pauses the shards while the NFS share with the object views is down;
+  - runs `corpus_scores.py` at every 10% of progress, to check that scores stay consistent.
+
+### Results
+
+Experts (four raters who rated all 1,000 pairs, 2026-10-11) and the v23 judge, then the judge on
+all 310,234 pairs. Scores are on a 0–100 scale; % Good in parentheses.
+
+| Criterion | Experts (1K) | Judge (1K) | AC1 judge–expert | AC1 expert–expert | Judge (all pairs) |
+|---|---|---|---|---|---|
+| Task | 93.7 ± 3.9 (89.4) | 93.3 (91.6) | .81 | .79 | 92.5 (90.7) |
+| Role | 97.5 ± 1.2 (96.1) | 96.5 (96.2) | .93 | .92 | 95.7 (95.2) |
+| Heatmaps | 86.8 ± 3.6 (80.7) | 90.3 (84.7) | .73 | .72 | 89.7 (83.4) |
+| All three Good | (72.5) | (75.9) | | | (73.3) |
+
+Notes on the run over all pairs:
+- **Completeness:** finished 2026-10-15. Every pair has all three labels: 930,702 rows, with no
+  duplicates and nothing missing.
+- **Failures:** 45 role answers were not valid JSON and count as failures.
+- **Agreement with the review run:** on the reviewed pairs, the corpus labels match v23's on
+  99.5% (task), 99.3% (role) and 98.1% (heatmaps).
+- **Heatmaps by dataset:** daily_used 90.1, electronics 89.2, furnitures 86.8.
+- **Cost:** about 306 GPU-hours on two RTX PRO 6000 cards.
 
 ## Tests
 

@@ -61,19 +61,24 @@ def save_webp(image: Image.Image, path: Path) -> None:
     os.replace(temporary, path)
 
 
+def sheets(row: dict[str, Any]) -> dict[str, Image.Image]:
+    """A pair's three review sheets: the object views ("rgb") and each hand's heatmap ("A", "B")."""
+    with np.load(row["scores_path"], allow_pickle=False) as data:
+        xyz = data["xyz"].astype(np.float32)
+        scores = {"A": data["scoreA"].astype(np.float32), "B": data["scoreB"].astype(np.float32)}
+    views, labels = row["views"], row["view_labels"]
+    made = {"rgb": _sheet([Image.open(view).convert("RGB") for view in views], labels, (255, 255, 255))}
+    for hand in ("A", "B"):
+        made[hand] = _sheet([_heat_panel(xyz, scores[hand], view, hand) for view in views], labels, BG)
+    return made
+
+
 def render(row: dict[str, Any], render_dir: str, force: bool) -> tuple[str, dict[str, str]]:
     base = Path(render_dir) / row["object_id"]
     paths = {kind: base / f"{row['qdir']}.{kind}.webp" for kind in ("rgb", "A", "B")}
     if force or not all(path.exists() for path in paths.values()):
-        with np.load(row["scores_path"], allow_pickle=False) as data:
-            xyz = data["xyz"].astype(np.float32)
-            scores = {"A": data["scoreA"].astype(np.float32), "B": data["scoreB"].astype(np.float32)}
-        views, labels = row["views"], row["view_labels"]
-        rgb = [Image.open(view).convert("RGB") for view in views]
-        save_webp(_sheet(rgb, labels, (255, 255, 255)), paths["rgb"])
-        for hand in ("A", "B"):
-            panels = [_heat_panel(xyz, scores[hand], view, hand) for view in views]
-            save_webp(_sheet(panels, labels, BG), paths[hand])
+        for kind, image in sheets(row).items():
+            save_webp(image, paths[kind])
     return row["sample_id"], {kind: str(path) for kind, path in paths.items()}
 
 

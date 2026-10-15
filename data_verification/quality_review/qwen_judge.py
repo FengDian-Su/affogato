@@ -20,10 +20,11 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from itertools import combinations
 import json
 import math
+import multiprocessing
 import os
 from pathlib import Path
 import statistics
@@ -32,7 +33,7 @@ import time
 from typing import Any
 
 from data_verification.quality_review.app import (
-    DEFAULT_DB, DEFAULT_ROOT, axis_ratings, connect, inspect_manifest, krippendorff_alpha, score,
+    DEFAULT_DB, DEFAULT_ROOT, IMAGE_KINDS, axis_ratings, connect, inspect_manifest, krippendorff_alpha, score,
 )
 
 MODEL, REVISION = "Qwen/Qwen3.8-27B", "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
@@ -183,12 +184,13 @@ def engine_kwargs() -> dict[str, Any]:
     return {"attention_backend": "TRITON_ATTN", "mm_encoder_attn_backend": "TORCH_SDPA"}
 
 
-def evidence(sample: Any, axis_id: str) -> tuple[list[str], list[str]]:
-    """The images a rater sees at this step, each with the caption placed before it."""
+def evidence(sample: Any, axis_id: str) -> tuple[list[str], list[str] | None]:
+    """The images a rater sees at this step, each with the caption placed before it. A pair whose review
+    sheets were never rendered to disk (the corpus) gets None, and run() draws them in memory."""
     if axis_id == "heatmap":
         return (["Object views:", "Hand A heatmap (orange):", "Hand B heatmap (teal):"],
                 [sample[key].replace("/release1000/renders/", "/release1000/renders_2x/")
-                 for key in ("rgb_path", "heat_a_path", "heat_b_path")])
+                 for key in ("rgb_path", "heat_a_path", "heat_b_path")] if sample["rgb_path"] else None)
     return ([f"View: {label}" for label in json.loads(sample["view_labels_json"])],
             json.loads(sample["manifest_json"])["views"])
 
@@ -227,6 +229,31 @@ def score_probs(completion: Any, think: bool = False) -> dict[str, float] | None
     return None
 
 
+def manifest_samples(path: Path, index: int, count: int) -> list[dict[str, Any]]:
+    """Shard index/count of a manifest, in the row shape inspect_manifest builds: only this shard's lines
+    are parsed, and each row keeps its own JSON line as manifest_json instead of re-encoding it."""
+    with path.open(encoding="utf-8") as stream:
+        lines = [line for line in stream if line.strip()]
+    rows = []
+    for position in range(index, len(lines), count):
+        source = json.loads(lines[position])
+        rows.append({
+            "sample_id": source["sample_id"], "sample_index": position, "split": source.get("split"),
+            "object_name": str(source.get("object_name") or "Object"), "task": str(source["task"]),
+            "roles_json": json.dumps(source.get("roles") or [], ensure_ascii=False),
+            "view_labels_json": json.dumps(source.get("view_labels") or []),
+            **{field: str(source.get(field) or "") for field in IMAGE_KINDS.values()},
+            "manifest_json": lines[position],
+        })
+    return rows
+
+
+def render_sheets(source: dict[str, Any]) -> list[Any]:
+    """In a render process: a pair's three review sheets at 512 px per view, drawn in memory."""
+    from data_verification.quality_review import render_hires
+    return render_hires.sheets(source)
+
+
 def run(args: argparse.Namespace) -> None:
     os.environ.setdefault("VLLM_PLUGINS", "")
     from PIL import Image
@@ -234,17 +261,21 @@ def run(args: argparse.Namespace) -> None:
     from vllm import LLM, SamplingParams
     from vllm.sampling_params import StructuredOutputsParams
 
-    if args.manifest:       # pairs outside the review (corpus_manifest.py), in the review's row format
-        samples = inspect_manifest(args.manifest, seed=0, check_images=False)
-    else:
-        connection = connect(args.db)
-        try:
-            samples = connection.execute("SELECT * FROM samples ORDER BY sample_index").fetchall()
-        finally:
-            connection.close()
+    processor_loading = ThreadPoolExecutor(1).submit(AutoProcessor.from_pretrained, MODEL, revision=REVISION)
     index, count = (int(part) for part in args.shard.split("/"))
-    samples = [sample for sample in samples if args.split in ("all", sample["split"])]
-    samples = samples[index::count][: args.limit or None]
+    if args.manifest and args.split == "all":   # the corpus (corpus_manifest.py): read only this shard's rows
+        samples = manifest_samples(args.manifest, index, count)
+    else:
+        if args.manifest:   # pairs outside the review, in the review's row format
+            samples = inspect_manifest(args.manifest, seed=0, check_images=False)
+        else:
+            connection = connect(args.db)
+            try:
+                samples = connection.execute("SELECT * FROM samples ORDER BY sample_index").fetchall()
+            finally:
+                connection.close()
+        samples = [sample for sample in samples if args.split in ("all", sample["split"])][index::count]
+    samples = samples[: args.limit or None]
     args.out.mkdir(parents=True, exist_ok=True)
     out = args.out / f"shard{index}.jsonl"
     done = {(row["sample_id"], row["axis"]) for row in read_jsonl(out)} if out.exists() else set()
@@ -255,14 +286,17 @@ def run(args: argparse.Namespace) -> None:
         "version": VERSION, "model": MODEL, "revision": REVISION,
         "samples": str(args.manifest or args.db),
         "images": {"task": "8 original views, 512 px", "role": "8 original views, 512 px",
-                   "heatmap": "object / Hand A / Hand B sheets, 512 px per view (renders_2x)"},
-        "decoding": {"temperature": 0, "thinking": args.think, "logprobs": 10}, "system_prompts": prompts,
+                   "heatmap": "object / Hand A / Hand B sheets, 512 px per view (render_hires.py; "
+                              "drawn in memory for pairs without files)"},
+        "decoding": {"temperature": 0, "thinking": args.think, "logprobs": 10}, "system_prompts": PROMPTS,
     }, indent=2) + "\n", encoding="utf-8")
-    print(f"shard {index}/{count}: {len(jobs)} requests to run ({len(done)} already done)", flush=True)
+    drawn = sum(evidence(sample, axis)[1] is None for sample, axis in jobs)
+    print(f"shard {index}/{count}: {len(jobs)} requests to run ({len(done)} already done; "
+          f"{drawn} with heatmap sheets drawn in memory)", flush=True)
     if not jobs:
         return
 
-    processor = AutoProcessor.from_pretrained(MODEL, revision=REVISION)
+    processor = processor_loading.result()
     extra = engine_kwargs()
     llm = LLM(model=MODEL, revision=REVISION, max_model_len=args.max_model_len, gpu_memory_utilization=args.gpu_mem,
               max_num_seqs=args.batch, enforce_eager=not extra, limit_mm_per_prompt={"image": 8, "video": 0},
@@ -280,14 +314,26 @@ def run(args: argparse.Namespace) -> None:
         return images
 
     loader = ThreadPoolExecutor(16)                   # the views are on NFS: read a chunk's images in parallel
-    started = time.time()
-    for start in range(0, len(jobs), args.batch * 4):
-        chunk = jobs[start:start + args.batch * 4]
+    drawer = (ProcessPoolExecutor(args.render_workers, mp_context=multiprocessing.get_context("spawn"))
+              if drawn else None)
+
+    def submit(chunk: list[tuple[Any, str]]) -> tuple[list, list]:
+        """Start reading, or drawing, a chunk's images."""
         evidences = [evidence(sample, axis) for sample, axis in chunk]
+        return evidences, [loader.submit(load, paths) if paths is not None
+                           else drawer.submit(render_sheets, json.loads(sample["manifest_json"]))
+                           for (sample, _), (_, paths) in zip(chunk, evidences)]
+
+    chunks = [jobs[start:start + args.batch * 4] for start in range(0, len(jobs), args.batch * 4)]
+    pending = submit(chunks[0])
+    started, finished = time.time(), 0
+    for position, chunk in enumerate(chunks):
+        evidences, images = pending
+        if position + 1 < len(chunks):
+            pending = submit(chunks[position + 1])    # the next chunk's images are made while this one runs
         requests = [{"prompt": chat_prompt(processor, prompts[axis], captions, case_text(sample, axis), args.think),
-                     "multi_modal_data": {"image": images}}
-                    for (sample, axis), (captions, _), images
-                    in zip(chunk, evidences, loader.map(load, [paths for _, paths in evidences]))]
+                     "multi_modal_data": {"image": future.result()}}
+                    for (sample, axis), (captions, _), future in zip(chunk, evidences, images)]
         results = llm.generate(requests, [params[axis] for _, axis in chunk], use_tqdm=False)
         with out.open("a", encoding="utf-8") as stream:
             for (sample, axis), result in zip(chunk, results):
@@ -302,7 +348,7 @@ def run(args: argparse.Namespace) -> None:
                     "answer": answer, "p": score_probs(completion, args.think),
                     "raw": completion.text, "version": VERSION,
                 }, ensure_ascii=False) + "\n")
-        finished = start + len(chunk)
+        finished += len(chunk)
         rate = (time.time() - started) / finished
         print(f"[{finished}/{len(jobs)}] {rate:.2f} s/request, eta {rate * (len(jobs) - finished) / 60:.1f} min",
               flush=True)
@@ -449,6 +495,8 @@ def main() -> None:
     sub.choices["run"].add_argument("--max-model-len", type=int, default=16384, help="context length")
     sub.choices["run"].add_argument("--axes", default=",".join(AXES), help="comma-separated subset of the criteria")
     sub.choices["run"].add_argument("--gpu-mem", type=float, default=0.88)
+    sub.choices["run"].add_argument("--render-workers", type=int, default=8,
+                                    help="processes drawing heatmap sheets for pairs without files")
     args = parser.parse_args()
     run(args) if args.command == "run" else evaluate(args)
 
